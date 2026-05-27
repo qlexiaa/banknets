@@ -1,0 +1,38 @@
+# ── Large data files ──────────────────────────────────────────────────────────
+data/fdic_deposits_1994_2005.csv
+data/merged_panel.gpkg
+
+# ── Documentation (PDFs) ─────────────────────────────────────────────────────
+docs/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environment ───────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Built artefacts (reproducible from pipeline scripts) ─────────────────────
+# Uncomment to also exclude the built weight matrices and panel:
+# data/W_bank_avg.npz
+# data/W_bank_count_avg.npz
+# data/W_geo_queen.gal
+# data/estimation_panel.csv
+
+# Tool / editor configs
+.claude/
