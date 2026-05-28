@@ -1,0 +1,15 @@
+metric,value
+n_counties,1023.0
+mean,0.34662756598240474
+median,0.4
+p25,0.2
+p75,0.4
+min,0.0
+max,1.0
+std,0.22685289005635376
+n_overlap_0,126.0
+n_overlap_1,14.0
+n_overlap_ge02,897.0
+n_overlap_ge04,544.0
+n_overlap_ge06,246.0
+n_overlap_ge08,72.0

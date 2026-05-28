@@ -35,6 +35,9 @@ import esda
 import statsmodels.api as sm
 from statsmodels.stats.sandwich_covariance import cov_cluster
 
+import utils  # noqa: applies spreg Panel_FE_Error compatibility patch
+
+
 ROOT       = Path(__file__).parent.parent
 PANEL_PATH = ROOT / "data" / "estimation_panel.csv"
 GPKG_PATH  = ROOT / "data" / "merged_panel.gpkg"
@@ -48,29 +51,6 @@ XVARS = [
     'Dl_hsosf', 'LDl_hsosf',
 ]
 YEARS = list(range(1995, 2006))
-
-
-print("=" * 65)
-print("SPATIAL HPI MODELS - W_geo QUEEN CONTIGUITY")
-print("=" * 65)
-
-# ── 1. Load ───────────────────────────────────────────────────────────────────
-print("\n[1] Loading data")
-
-df_raw = pd.read_csv(PANEL_PATH, dtype={'fips5': str})
-df_raw['year'] = df_raw['year'].astype(int)
-print(f"    Panel   : {df_raw.shape}  "
-      f"({df_raw['fips5'].nunique()} counties, {df_raw['year'].nunique()} years)")
-
-gdf_all = gpd.read_file(GPKG_PATH, engine='pyogrio')
-counties_geo = (
-    gdf_all[gdf_all['geometry'].notna()]
-    .drop_duplicates(subset='fips5')[['fips5', 'geometry']]
-    .reset_index(drop=True)
-)
-
-# ── 2. Build balanced samples + spatial weights ───────────────────────────────
-print("\n[2] Building balanced samples and spatial weights")
 
 
 def prepare_sample(df, counties_geo, yvar, xvars, border_filter=None, label=''):
@@ -105,21 +85,9 @@ def prepare_sample(df, counties_geo, yvar, xvars, border_filter=None, label=''):
     df['_wr'] = df['fips5'].map(id_to_row)
     df = df.sort_values(['year', '_wr']).drop(columns='_wr').reset_index(drop=True)
 
-    print(f"    {label:<20}: {w.n:>4} counties  {len(df):>6} obs  "
-          f"{len(islands)} island(s) dropped")
     return df, w
 
 
-df_full, w_full = prepare_sample(
-    df_raw, counties_geo, YVAR, XVARS,
-    border_filter=None, label='Full sample')
-
-df_nb, w_nb = prepare_sample(
-    df_raw, counties_geo, YVAR, XVARS,
-    border_filter=0, label='Non-border (border=0)')
-
-
-# ── 3. Helpers ────────────────────────────────────────────────────────────────
 def within_demean(df, cols, county_col='fips5', year_col='year'):
     """Two-way within-transformation (FWL for county + year FE)."""
     out = df.copy()
@@ -129,10 +97,6 @@ def within_demean(df, cols, county_col='fips5', year_col='year'):
         ym = df.groupby(year_col)[col].transform('mean')
         out[col] = df[col] - cm - ym + gm
     return out
-
-
-# ── 4. OLS ────────────────────────────────────────────────────────────────────
-print("\n[3] OLS (within-demeaned, state-clustered SEs)")
 
 
 def run_ols(df, yvar, xvars, label=''):
@@ -170,18 +134,6 @@ def run_ols(df, yvar, xvars, label=''):
     }
 
 
-ols_full = run_ols(df_full, YVAR, XVARS, 'OLS -- full')
-ols_nb   = run_ols(df_nb,   YVAR, XVARS, 'OLS -- non-border')
-
-for r in [ols_full, ols_nb]:
-    print(f"    {r['label']:<25}  b={r['beta']:.4f}  SE={r['se']:.4f}  "
-          f"N={r['n_obs']}  counties={r['n_counties']}")
-
-
-# ── 5. SEM — Panel_FE_Error ───────────────────────────────────────────────────
-print("\n[4] SEM -- Panel_FE_Error (GM estimator)")
-
-
 def run_sem(df, w, yvar, xvars, label=''):
     y   = df[[yvar]].values.astype(float)
     X   = df[xvars].values.astype(float)
@@ -192,7 +144,6 @@ def run_sem(df, w, yvar, xvars, label=''):
     se   = float(np.sqrt(sem.vm[idx, idx]))
     lam  = float(sem.betas[-1, 0])
 
-    print(f"    {label:<25}  b={beta:.4f}  SE={se:.4f}  lam={lam:.4f}  N={len(y)}")
     return {
         'label'        : label,
         'model'        : 'SEM',
@@ -205,14 +156,6 @@ def run_sem(df, w, yvar, xvars, label=''):
     }
 
 
-sem_full = run_sem(df_full, w_full, YVAR, XVARS, 'SEM -- full')
-sem_nb   = run_sem(df_nb,   w_nb,   YVAR, XVARS, 'SEM -- non-border')
-
-
-# ── 6. SAR — Panel_FE_Lag ─────────────────────────────────────────────────────
-print("\n[5] SAR -- Panel_FE_Lag (ML estimator)")
-
-
 def run_sar(df, w, yvar, xvars, label=''):
     y   = df[[yvar]].values.astype(float)
     X   = df[xvars].values.astype(float)
@@ -223,7 +166,6 @@ def run_sar(df, w, yvar, xvars, label=''):
     se   = float(np.sqrt(sar.vm[idx, idx]))
     rho  = float(sar.betas[-1, 0])
 
-    print(f"    {label:<25}  b={beta:.4f}  SE={se:.4f}  rho={rho:.4f}  N={len(y)}")
     return {
         'label'        : label,
         'model'        : 'SAR',
@@ -236,66 +178,93 @@ def run_sar(df, w, yvar, xvars, label=''):
     }
 
 
-sar_full = run_sar(df_full, w_full, YVAR, XVARS, 'SAR -- full')
-sar_nb   = run_sar(df_nb,   w_nb,   YVAR, XVARS, 'SAR -- non-border')
+def run(output_dir=None):
+    if output_dir is not None:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── 1. Load ───────────────────────────────────────────────────────────────
+    df_raw = pd.read_csv(PANEL_PATH, dtype={'fips5': str})
+    df_raw['year'] = df_raw['year'].astype(int)
+
+    gdf_all = gpd.read_file(GPKG_PATH, engine='pyogrio')
+    counties_geo = (
+        gdf_all[gdf_all['geometry'].notna()]
+        .drop_duplicates(subset='fips5')[['fips5', 'geometry']]
+        .reset_index(drop=True)
+    )
+
+    # ── 2. Build balanced samples + spatial weights ───────────────────────────
+    df_full, w_full = prepare_sample(
+        df_raw, counties_geo, YVAR, XVARS,
+        border_filter=None, label='Full sample')
+
+    df_nb, w_nb = prepare_sample(
+        df_raw, counties_geo, YVAR, XVARS,
+        border_filter=0, label='Non-border (border=0)')
+
+    # ── 3. OLS ────────────────────────────────────────────────────────────────
+    ols_full = run_ols(df_full, YVAR, XVARS, 'OLS -- full')
+    ols_nb   = run_ols(df_nb,   YVAR, XVARS, 'OLS -- non-border')
+
+    # ── 4. SEM ────────────────────────────────────────────────────────────────
+    sem_full = run_sem(df_full, w_full, YVAR, XVARS, 'SEM -- full')
+    sem_nb   = run_sem(df_nb,   w_nb,   YVAR, XVARS, 'SEM -- non-border')
+
+    # ── 5. SAR ────────────────────────────────────────────────────────────────
+    sar_full = run_sar(df_full, w_full, YVAR, XVARS, 'SAR -- full')
+    sar_nb   = run_sar(df_nb,   w_nb,   YVAR, XVARS, 'SAR -- non-border')
+
+    # ── 6. Moran's I on OLS residuals ────────────────────────────────────────
+    resid_full = ols_full['resid']
+    year_arr   = ols_full['year_arr']
+
+    moran_rows = []
+    for yr in YEARS:
+        mask = year_arr == yr
+        r_yr = resid_full[mask]
+        n_yr = int(mask.sum())
+
+        if n_yr != w_full.n:
+            continue
+
+        mi  = esda.Moran(r_yr, w_full)
+        sig = ('***' if mi.p_norm < 0.001 else
+               '**'  if mi.p_norm < 0.01  else
+               '*'   if mi.p_norm < 0.05  else '')
+        moran_rows.append(dict(
+            year=yr, n=n_yr,
+            moran_i=mi.I, expected_i=mi.EI, z_norm=mi.z_norm,
+            p_norm=mi.p_norm, significant=sig,
+        ))
+
+    # ── 7. Save outputs ───────────────────────────────────────────────────────
+    if output_dir is not None:
+        main_rows = []
+        for r in [ols_full, sem_full, sar_full, ols_nb, sem_nb, sar_nb]:
+            main_rows.append(dict(
+                model=r['model'],
+                label=r['label'],
+                beta=r['beta'],
+                se=r['se'],
+                spatial_param=r['spatial_param'],
+                param_name=r['param_name'],
+                n_counties=r['n_counties'],
+                n_obs=r['n_obs'],
+            ))
+        pd.DataFrame(main_rows).to_csv(
+            output_dir / "spatial_hpi_main_results.csv", index=False)
+
+        pd.DataFrame(moran_rows).to_csv(
+            output_dir / "spatial_hpi_morans_i.csv", index=False)
+
+    return {
+        'ols_full': ols_full, 'ols_nb': ols_nb,
+        'sem_full': sem_full, 'sem_nb': sem_nb,
+        'sar_full': sar_full, 'sar_nb': sar_nb,
+        'moran_rows': moran_rows,
+    }
 
 
-# ── 7. Results table ──────────────────────────────────────────────────────────
-print()
-print("=" * 78)
-print("RESULTS - HPI Reduced-Form Spatial Models (W_geo Queen Contiguity)")
-print("=" * 78)
-print(f"{'Model':<26}  {'b(Linter_bra)':>14}  {'SE':>8}  "
-      f"{'Spatial':>12}  {'Counties':>9}  {'Obs':>7}")
-print("-" * 78)
-
-for r in [ols_full, sem_full, sar_full]:
-    sp = f"{r['param_name']}={r['spatial_param']:.4f}" if r['param_name'] else '-'
-    print(f"{r['label']:<26}  {r['beta']:>14.4f}  {r['se']:>8.4f}  "
-          f"{sp:>12}  {r['n_counties']:>9}  {r['n_obs']:>7}")
-
-print()
-for r in [ols_nb, sem_nb, sar_nb]:
-    sp = f"{r['param_name']}={r['spatial_param']:.4f}" if r['param_name'] else '-'
-    print(f"{r['label']:<26}  {r['beta']:>14.4f}  {r['se']:>8.4f}  "
-          f"{sp:>12}  {r['n_counties']:>9}  {r['n_obs']:>7}")
-
-print("=" * 78)
-print("Notes:")
-print("  OLS  -- county + year FEs via within-demeaning; SEs clustered by state.")
-print("  SEM  -- spreg.Panel_FE_Error; GM estimator; model-based SEs.")
-print("  SAR  -- spreg.Panel_FE_Lag;   ML estimator; model-based SEs.")
-print("  Non-border subsample: counties with border == 0.")
-
-
-# ── 8. Moran's I on OLS residuals ────────────────────────────────────────────
-print()
-print("=" * 65)
-print("MORAN'S I ON OLS RESIDUALS - Full Sample, by Year")
-print("=" * 65)
-print(f"{'Year':<6}  {'N':>5}  {'Moran I':>9}  {'E[I]':>7}  "
-      f"{'z-score':>8}  {'p-value':>9}  {'sig':>4}")
-print("-" * 58)
-
-resid_full = ols_full['resid']
-year_arr   = ols_full['year_arr']
-
-for yr in YEARS:
-    mask = year_arr == yr
-    r_yr = resid_full[mask]
-    n_yr = int(mask.sum())
-
-    if n_yr != w_full.n:
-        print(f"{yr:<6}  {n_yr:>5}  [skip -- {n_yr} residuals vs {w_full.n} W rows]")
-        continue
-
-    mi  = esda.Moran(r_yr, w_full)
-    sig = ('***' if mi.p_norm < 0.001 else
-           '**'  if mi.p_norm < 0.01  else
-           '*'   if mi.p_norm < 0.05  else '')
-    print(f"{yr:<6}  {n_yr:>5}  {mi.I:>9.4f}  {mi.EI:>7.4f}  "
-          f"{mi.z_norm:>8.3f}  {mi.p_norm:>9.4f}  {sig:>4}")
-
-print("-" * 58)
-print("Significance: *** p<0.001  ** p<0.01  * p<0.05")
-print("\nDone.")
+if __name__ == '__main__':
+    run(Path(__file__).parent.parent / 'output')

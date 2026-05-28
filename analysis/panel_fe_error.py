@@ -26,7 +26,9 @@ import numpy as np
 import scipy.sparse
 import spreg
 
+import utils  # noqa: applies spreg Panel_FE_Error compatibility patch
 from utils import gal_to_W, row_standardize, sparse_to_pysal_w
+
 
 ROOT        = Path(__file__).parent.parent
 PANEL_PATH  = ROOT / "data" / "estimation_panel.csv"
@@ -34,28 +36,10 @@ GAL_PATH    = ROOT / "data" / "W_geo_queen.gal"
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 WBANK_PATH  = ROOT / "data" / "W_bank_avg.npz"
 
-# ── Load shared inputs ────────────────────────────────────────────────────────
-co_df        = pd.read_csv(COUNTY_PATH, dtype={"fips5": str})
-county_order = co_df["fips5"].str.zfill(5).tolist()
-N_ALL        = len(county_order)
-
-W_geo_all, gal_order = gal_to_W(GAL_PATH, county_order)
-assert gal_order == county_order, "GAL order != county_order_Wgeo.csv"
-print(f"[OK] County order verified  |  N={N_ALL}")
-
-W_bank_all = row_standardize(scipy.sparse.load_npz(WBANK_PATH))
-
-panel = pd.read_csv(PANEL_PATH)
-panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
-YEARS    = sorted(panel["year"].unique())
-T        = len(YEARS)
-year_pos = {yr: i for i, yr in enumerate(YEARS)}
-print(f"Panel: {panel.shape[0]:,} rows | {panel['fips5'].nunique()} counties"
-      f" | T={T} | {YEARS[0]}-{YEARS[-1]}")
-
 
 # ── Build arrays for Panel_FE_Error ──────────────────────────────────────────
-def build_arrays(panel_sub, sample_label):
+def build_arrays(panel, county_order, W_geo_all, W_bank_all, YEARS, year_pos,
+                 N_ALL, panel_sub, sample_label):
     """
     Build y and x in LONG format for Panel_FE_Error.
 
@@ -66,14 +50,12 @@ def build_arrays(panel_sub, sample_label):
 
     Counties within each time block are sorted in W county_order row order.
     """
+    T = len(YEARS)
     na_all   = panel_sub.groupby("fips5")["Linter_ela"].apply(lambda s: s.isna().all())
     sub_co   = set(panel_sub["fips5"].unique())
     usable   = [c for c in county_order if c in sub_co and not na_all.get(c, True)]
     N        = len(usable)
     usable_pos = {c: i for i, c in enumerate(usable)}
-
-    print(f"\n  [{sample_label}]  usable counties={N}  n_obs={N*T:,}"
-          f"  (dropped {N_ALL - N})")
 
     df = (panel_sub[panel_sub["fips5"].isin(set(usable))]
           .assign(t_idx=lambda d: d["year"].map(year_pos),
@@ -106,7 +88,7 @@ def build_arrays(panel_sub, sample_label):
 
 
 # ── Run Panel_FE_Error ────────────────────────────────────────────────────────
-def run_panel_fe(y, x, w_pysal, w_label, ds_label):
+def run_panel_fe(y, x, w_pysal, w_label, ds_label, YEARS):
     nx = ["Linter_bra"] + [f"yr{yr}" for yr in YEARS[1:]]
     return spreg.Panel_FE_Error(
         y, x, w_pysal,
@@ -117,7 +99,7 @@ def run_panel_fe(y, x, w_pysal, w_label, ds_label):
     )
 
 
-def extract(res, N):
+def extract(res, N, T):
     """
     Extract key results from Panel_FE_Error.
     betas layout: [beta_Linter_bra, yr1996, ..., yr2005, lambda]
@@ -134,77 +116,61 @@ def extract(res, N):
                 n_co=N,    n_obs=N * T)
 
 
-# ── Estimate ──────────────────────────────────────────────────────────────────
-print("\n" + "=" * 65)
-print("ESTIMATION  (Panel_FE_Error, ML, two-way FE: county + year dummies)")
-print("=" * 65)
+def run(output_dir=None):
+    if output_dir is not None:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-results = {}
+    # ── Load shared inputs ────────────────────────────────────────────────────
+    co_df        = pd.read_csv(COUNTY_PATH, dtype={"fips5": str})
+    county_order = co_df["fips5"].str.zfill(5).tolist()
+    N_ALL        = len(county_order)
 
-y_f, x_f, w_geo_f, w_bank_f, N_f = build_arrays(panel, "Full sample")
-results["FE W_geo (full)"]  = extract(run_panel_fe(y_f, x_f, w_geo_f,  "W_geo",  "Full"), N_f)
-results["FE W_bank (full)"] = extract(run_panel_fe(y_f, x_f, w_bank_f, "W_bank", "Full"), N_f)
+    W_geo_all, gal_order = gal_to_W(GAL_PATH, county_order)
+    assert gal_order == county_order, "GAL order != county_order_Wgeo.csv"
 
-panel_nb = panel[panel["border"] == 0].copy()
-y_nb, x_nb, w_geo_nb, w_bank_nb, N_nb = build_arrays(panel_nb, "Non-border")
-results["FE W_geo (non-border)"]  = extract(run_panel_fe(y_nb, x_nb, w_geo_nb,  "W_geo",  "NB"), N_nb)
-results["FE W_bank (non-border)"] = extract(run_panel_fe(y_nb, x_nb, w_bank_nb, "W_bank", "NB"), N_nb)
+    W_bank_all = row_standardize(scipy.sparse.load_npz(WBANK_PATH))
+
+    panel = pd.read_csv(PANEL_PATH)
+    panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
+    YEARS    = sorted(panel["year"].unique())
+    T        = len(YEARS)
+    year_pos = {yr: i for i, yr in enumerate(YEARS)}
+
+    # ── Estimate ──────────────────────────────────────────────────────────────
+    results = {}
+
+    y_f, x_f, w_geo_f, w_bank_f, N_f = build_arrays(
+        panel, county_order, W_geo_all, W_bank_all, YEARS, year_pos, N_ALL,
+        panel, "Full sample")
+    results["FE W_geo (full)"]  = extract(
+        run_panel_fe(y_f, x_f, w_geo_f,  "W_geo",  "Full", YEARS), N_f, T)
+    results["FE W_bank (full)"] = extract(
+        run_panel_fe(y_f, x_f, w_bank_f, "W_bank", "Full", YEARS), N_f, T)
+
+    panel_nb = panel[panel["border"] == 0].copy()
+    y_nb, x_nb, w_geo_nb, w_bank_nb, N_nb = build_arrays(
+        panel, county_order, W_geo_all, W_bank_all, YEARS, year_pos, N_ALL,
+        panel_nb, "Non-border")
+    results["FE W_geo (non-border)"]  = extract(
+        run_panel_fe(y_nb, x_nb, w_geo_nb,  "W_geo",  "NB", YEARS), N_nb, T)
+    results["FE W_bank (non-border)"] = extract(
+        run_panel_fe(y_nb, x_nb, w_bank_nb, "W_bank", "NB", YEARS), N_nb, T)
+
+    # ── Save results to CSV ───────────────────────────────────────────────────
+    if output_dir is not None:
+        rows = []
+        for model_name, r in results.items():
+            rows.append(dict(
+                model=model_name,
+                beta=r["beta"],    se_beta=r["se_beta"], z_beta=r["z_beta"], p_beta=r["p_beta"],
+                lam=r["lam"],      se_lam=r["se_lam"],   z_lam=r["z_lam"],   p_lam=r["p_lam"],
+                n_co=r["n_co"],    n_obs=r["n_obs"],
+            ))
+        pd.DataFrame(rows).to_csv(output_dir / "panel_fe_results.csv", index=False)
+
+    return results
 
 
-# ── Results table ─────────────────────────────────────────────────────────────
-HDR = "{:<28s}  {:>9s}  {:>7s}  {:>7s}  {:>9s}  {:>7s}  {:>7s}  {:>7s}  {:>7s}"
-ROW = "{:<28s}  {:>9.4f}  {:>7.4f}  {:>7.3f}  {:>9.4f}  {:>7.4f}  {:>7.3f}  {:>7d}  {:>7d}"
-SEP = "-" * 100
-
-print("\n" + "=" * 100)
-print("RESULTS TABLE -- Panel_FE_Error (ML), two-way FE (county FE + year dummies 1996-2005)")
-print("=" * 100)
-print(HDR.format("Model", "b(dereg)", "SE", "p", "lambda", "SE(lam)", "p(lam)", "N co.", "N obs"))
-print(SEP)
-for name, r in results.items():
-    print(ROW.format(name, r["beta"], r["se_beta"], r["p_beta"],
-                     r["lam"],  r["se_lam"],  r["p_lam"],
-                     r["n_co"], r["n_obs"]))
-print(SEP)
-
-
-# ── Comparison with pooled GM results ────────────────────────────────────────
-print("""
-COMPARISON: Panel_FE_Error two-way FE (ML) vs Pooled GM_Error (two-way demeaned)
-----------------------------------------------------------------------------------
-Pooled GM : two-way within-demean (county + year FEs), block-diagonal W, GM estimator
-Panel FE  : county FE via within-transform + explicit year dummies, cross-sec W, ML
-""")
-gm_results = {
-    "W_geo  full"    : (2.3143, 0.0172, 0.8058),
-    "W_bank full"    : (2.4057, 0.0183, 0.9900),
-    "W_geo  non-bdr" : (2.2086, 0.0280, 0.8036),
-    "W_bank non-bdr" : (2.4843, 0.0222, 0.9900),
-}
-fe_keys = {
-    "W_geo  full"    : "FE W_geo (full)",
-    "W_bank full"    : "FE W_bank (full)",
-    "W_geo  non-bdr" : "FE W_geo (non-border)",
-    "W_bank non-bdr" : "FE W_bank (non-border)",
-}
-
-HDR2 = "{:<18s}  {:>9s}  {:>9s}  {:>10s}  {:>10s}  {:>10s}  {:>10s}"
-ROW2 = "{:<18s}  {:>9.4f}  {:>9.4f}  {:>10.4f}  {:>10.4f}  {:>10.4f}  {:>10.4f}"
-print(HDR2.format("Spec", "GM beta", "FE beta", "delta_b", "GM lam", "FE lam", "delta_lam"))
-print("-" * 85)
-for key, (gm_b, gm_se, gm_lam) in gm_results.items():
-    fe = results[fe_keys[key]]
-    print(ROW2.format(key, gm_b, fe["beta"], fe["beta"] - gm_b,
-                      gm_lam, fe["lam"], fe["lam"] - gm_lam))
-
-# ── W_bank lambda > W_geo lambda? ─────────────────────────────────────────────
-print()
-for sample, geo_key, bank_key in [
-    ("full",       "FE W_geo (full)",       "FE W_bank (full)"),
-    ("non-border", "FE W_geo (non-border)", "FE W_bank (non-border)"),
-]:
-    lg  = results[geo_key]["lam"]
-    lb  = results[bank_key]["lam"]
-    tag = "[YES]" if lb > lg else "[NO] "
-    print(f"W_bank lambda > W_geo lambda ({sample:<11}): "
-          f"bank={lb:.4f}  geo={lg:.4f}  --> {tag}")
+if __name__ == '__main__':
+    run(Path(__file__).parent.parent / 'output')
