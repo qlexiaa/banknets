@@ -22,6 +22,11 @@ import bank_geo_overlap
 import bank_nongeo
 import lambda_time
 import lambda_time_yearspecific
+import rq1_inference
+import rq1_lm_tests
+import rq1_four_w_comparison
+import rq1_jtest
+import rq1_composite_w
 
 # Run all in order
 panel_fe_error.run(OUTPUT_DIR)
@@ -32,3 +37,8 @@ bank_geo_overlap.run(OUTPUT_DIR)
 bank_nongeo.run(OUTPUT_DIR)
 lambda_time.run(OUTPUT_DIR)
 lambda_time_yearspecific.run(OUTPUT_DIR)
+rq1_inference.run(OUTPUT_DIR)
+rq1_lm_tests.run(OUTPUT_DIR)
+rq1_four_w_comparison.run(OUTPUT_DIR)
+rq1_jtest.run(OUTPUT_DIR)
+rq1_composite_w.run(OUTPUT_DIR)

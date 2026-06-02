@@ -51,12 +51,13 @@ try:
         _orig_top = _out_mod._nonspat_top
 
         def _safe_nonspat_top(reg, *args, **kwargs):
-            # Coerce 1-element array sig2 to scalar before %-formatting
+            # Coerce 1-element array sig2 to numpy scalar so both
+            # %-formatting AND .item() calls succeed (np.float64 supports both)
             for _attr in ('sig2', 'sig2ML', 'sig2n', 'sig2n_k'):
                 if hasattr(reg, _attr):
                     try:
                         setattr(reg, _attr,
-                                float(np.asarray(getattr(reg, _attr)).flat[0]))
+                                np.float64(np.asarray(getattr(reg, _attr)).flat[0]))
                     except Exception:
                         pass
             try:
