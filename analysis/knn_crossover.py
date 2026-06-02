@@ -30,7 +30,7 @@ GAL_PATH    = ROOT / "data" / "W_geo_queen.gal"
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 WBANK_PATH  = ROOT / "data" / "W_bank_avg.npz"
 
-K_VALUES = [5, 6, 7, 8, 9, 10, 20]
+K_VALUES = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 
 # Reference lambdas from Panel_FE_Error with W_geo (from panel_fe_error.py)
 LAM_GEO_FULL = 0.8268
