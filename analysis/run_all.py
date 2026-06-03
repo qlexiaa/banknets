@@ -27,6 +27,7 @@ import rq1_lm_tests
 import rq1_four_w_comparison
 import rq1_jtest
 import rq1_composite_w
+import panel_fe_credit
 
 # Run all in order
 panel_fe_error.run(OUTPUT_DIR)
@@ -42,3 +43,4 @@ rq1_lm_tests.run(OUTPUT_DIR)
 rq1_four_w_comparison.run(OUTPUT_DIR)
 rq1_jtest.run(OUTPUT_DIR)
 rq1_composite_w.run(OUTPUT_DIR)
+panel_fe_credit.run(OUTPUT_DIR)
