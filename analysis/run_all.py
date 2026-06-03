@@ -28,6 +28,10 @@ import rq1_four_w_comparison
 import rq1_jtest
 import rq1_composite_w
 import panel_fe_credit
+import rq1_four_w_comparison_credit
+import bank_nongeo_credit
+import knn_crossover_credit
+import lambda_time_yearspecific_credit
 
 # Run all in order
 panel_fe_error.run(OUTPUT_DIR)
@@ -44,3 +48,7 @@ rq1_four_w_comparison.run(OUTPUT_DIR)
 rq1_jtest.run(OUTPUT_DIR)
 rq1_composite_w.run(OUTPUT_DIR)
 panel_fe_credit.run(OUTPUT_DIR)
+rq1_four_w_comparison_credit.run(OUTPUT_DIR)
+bank_nongeo_credit.run(OUTPUT_DIR)
+knn_crossover_credit.run(OUTPUT_DIR)
+lambda_time_yearspecific_credit.run(OUTPUT_DIR)
