@@ -4,10 +4,12 @@ knn_crossover_credit.py
 Credit-DV parallel of knn_crossover.py.
 Dependent variable: Dl_nloans_b (dln commercial-bank mortgage loans).
 
-Sweeps k = 5..20 to find the crossover k where lambda_knn > lambda_geo for
+Sweeps k = 1..20 to find the crossover k where lambda_knn > lambda_geo for
 credit growth. Reference lambdas from panel_fe_credit_results.csv:
   lam_geo_full = 0.1801
   lam_geo_nb   = 0.1701
+
+Also reports density/sparsity of each W_bank_k matrix.
 
 Output: output/knn_sweep_credit_results.csv
 """
@@ -31,7 +33,7 @@ GAL_PATH    = ROOT / "data" / "W_geo_queen.gal"
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 WBANK_PATH  = ROOT / "data" / "W_bank_avg.npz"
 
-K_VALUES = list(range(5, 21))   # 5, 6, 7, ..., 20
+K_VALUES = list(range(1, 21))
 
 # Reference lambdas from panel_fe_credit.py
 LAM_GEO_FULL = 0.1801
@@ -122,6 +124,12 @@ def run(output_dir=None):
         print(f"  k={k} ...", flush=True)
         W_knn_all = build_wbank_knn(W_bank_all, k)
 
+        nz  = W_knn_all.nnz - (W_knn_all.diagonal() != 0).sum()
+        tot = N_ALL * (N_ALL - 1)
+        density  = nz / tot
+        sparsity = 1.0 - density
+        avg_nbrs = nz / N_ALL
+
         y_f, x_f, w_knn_f, N_f = build_arrays(
             panel, county_order, W_knn_all, YEARS, year_pos, "Full")
         res_f = run_fe(y_f, x_f, w_knn_f, f"W_bank_k{k}", "Full", YEARS)
@@ -134,6 +142,11 @@ def run(output_dir=None):
 
         sweep_rows.append(dict(
             k               = k,
+            n_links         = nz,
+            possible_links  = tot,
+            density         = density,
+            sparsity        = sparsity,
+            avg_nbrs        = avg_nbrs,
             lam_geo         = LAM_GEO_FULL,
             lam_bank_knn    = lam_f,
             gap             = lam_f  - LAM_GEO_FULL,
@@ -149,15 +162,15 @@ def run(output_dir=None):
     df_sweep = pd.DataFrame(sweep_rows)
 
     # ── Print table ───────────────────────────────────────────────────────────
-    W = 70
+    W = 98
     print()
     print("=" * W)
     print(f"KNN crossover sweep -- DV: {DV}")
     print(f"Ref lambda: geo_full={LAM_GEO_FULL}  geo_nb={LAM_GEO_NB}")
     print(f"Gap = lam_knn - lam_geo  |  '<<' marks first k where gap > 0")
     print("=" * W)
-    print(f"{'k':>4}  {'lam_knn(F)':>11} {'gap(F)':>8}  "
-          f"{'lam_knn(NB)':>12} {'gap(NB)':>8}")
+    print(f"{'k':>4}  {'density':>9} {'sparsity':>9} {'avg_nbrs':>8}  "
+          f"{'lam_knn(F)':>11} {'gap(F)':>8}  {'lam_knn(NB)':>12} {'gap(NB)':>8}")
     print("-" * W)
     cross_f  = None
     cross_nb = None
@@ -166,8 +179,10 @@ def run(output_dir=None):
         tag_nb = " <<" if row["gap_nb"] > 0 and cross_nb is None else "   "
         if row["gap"]    > 0 and cross_f  is None: cross_f  = row["k"]
         if row["gap_nb"] > 0 and cross_nb is None: cross_nb = row["k"]
-        print(f"{row['k']:>4}  {row['lam_bank_knn']:>11.4f} {row['gap']:>+8.4f}{tag_f}  "
-              f"{row['lam_bank_knn_nb']:>12.4f} {row['gap_nb']:>+8.4f}{tag_nb}")
+        print(f"{row['k']:>4}  {row['density']:>9.5f} {row['sparsity']:>9.5f} "
+              f"{row['avg_nbrs']:>8.2f}  {row['lam_bank_knn']:>11.4f} "
+              f"{row['gap']:>+8.4f}{tag_f}  {row['lam_bank_knn_nb']:>12.4f} "
+              f"{row['gap_nb']:>+8.4f}{tag_nb}")
 
     print()
     cf  = cross_f  if cross_f  is not None else ">20"
@@ -176,7 +191,8 @@ def run(output_dir=None):
     print("=" * W)
 
     if output_dir is not None:
-        cols = ["k","lam_geo","lam_bank_knn","gap","n_co","n_obs",
+        cols = ["k","n_links","possible_links","density","sparsity","avg_nbrs",
+                "lam_geo","lam_bank_knn","gap","n_co","n_obs",
                 "lam_geo_nb","lam_bank_knn_nb","gap_nb","n_co_nb","n_obs_nb"]
         df_sweep[cols].to_csv(output_dir / "knn_sweep_credit_results.csv", index=False)
         print(f"\nSaved knn_sweep_credit_results.csv to {output_dir}")

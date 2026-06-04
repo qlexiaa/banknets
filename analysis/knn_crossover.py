@@ -1,12 +1,12 @@
 """
-KNN crossover analysis: k sweep (k=5..10, 20) to find crossover point where
+KNN crossover analysis: k sweep (k=1..20) to find crossover point where
 lambda_knn > lambda_geo, for full sample and non-border sample.
 
 Part A: k sweep
-  For each k in [5, 6, 7, 8, 9, 10, 20]:
+  For each k in 1, 2, ..., 20:
     Build W_bank_knn by keeping top-k weights per row (zero rest, row-standardise).
     Run Panel_FE_Error (county FE + year dummies 1996-2005).
-    Record lambda, SE(lambda), beta(Linter_bra), SE(beta) for full and non-border.
+    Record lambda, density, sparsity, and average neighbors for full and non-border.
 
 Part B: crossover identification
   Crossover k = first k where lambda_knn > lambda_geo for each sample.
@@ -30,7 +30,7 @@ GAL_PATH    = ROOT / "data" / "W_geo_queen.gal"
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 WBANK_PATH  = ROOT / "data" / "W_bank_avg.npz"
 
-K_VALUES = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+K_VALUES = list(range(1, 21))
 
 # Reference lambdas from Panel_FE_Error with W_geo (from panel_fe_error.py)
 LAM_GEO_FULL = 0.8268
@@ -144,10 +144,11 @@ def run(output_dir=None):
     for k in K_VALUES:
         W_knn_all = build_wbank_knn(W_bank_all, k)
 
-        # Sparsity of this knn matrix
+        # Matrix density/sparsity for the full cross-sectional W.
         nz  = W_knn_all.nnz - (W_knn_all.diagonal() != 0).sum()
         tot = N_ALL * (N_ALL - 1)
         density   = nz / tot
+        sparsity  = 1.0 - density
         avg_nbrs  = nz / N_ALL
 
         # Full sample
@@ -169,7 +170,10 @@ def run(output_dir=None):
 
         sweep_rows.append(dict(
             k=k,
+            n_links=nz,
+            possible_links=tot,
             density=density,
+            sparsity=sparsity,
             avg_nbrs=avg_nbrs,
             lam_full=res_f["lam"],
             gap_full=gap_full,
