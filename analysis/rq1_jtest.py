@@ -28,7 +28,7 @@ Samples:      Full, Non-border
 
 W_bank_nonGeo must exist at data/W_bank_nonGeo.npz (built by rq1_four_w_comparison.py).
 
-Output: output/jtest_results.csv
+Output: output/jtest_credit_results.csv
 """
 import warnings
 warnings.filterwarnings("ignore")
@@ -40,6 +40,7 @@ import scipy.sparse
 import spreg
 
 import utils  # noqa: applies spreg compatibility patch
+from panel_fe_credit import load_panel_with_credit
 from utils import gal_to_W, row_standardize, sparse_to_pysal_w
 
 ROOT           = Path(__file__).parent.parent
@@ -49,6 +50,7 @@ COUNTY_PATH    = ROOT / "data" / "county_order_Wgeo.csv"
 WBANK_BIN_PATH = ROOT / "data" / "W_bank_avg.npz"
 WBANK_CNT_PATH = ROOT / "data" / "W_bank_count_avg.npz"
 WBANK_NG_PATH  = ROOT / "data" / "W_bank_nonGeo.npz"
+DV             = "Dl_nloans_b"
 
 
 # ── Core helpers ─────────────────────────────────────────────────────────────
@@ -90,7 +92,7 @@ def run_jtest_direction(y_long, x_long, m_alt, w_null_pysal,
 
     res_aug = spreg.Panel_FE_Error(
         y_long, x_aug, w_null_pysal,
-        name_y="Linter_ela",
+        name_y=DV,
         name_x=nx,
         name_w=w_null_label,
         name_ds=f"{sample_label}|J({w_null_label}<-{w_alt_label})",
@@ -116,7 +118,7 @@ def run_pair(panel_sub, county_order, W_null_all, W_alt_all,
     the null-model augmented regression.
 
     County filtering:
-      1. Counties present in panel_sub with non-all-NaN Linter_ela
+      1. Counties present in panel_sub with no missing Dl_nloans_b
       2. Full-matrix islands (zero rows) in EITHER W are excluded
     """
     T = len(YEARS)
@@ -129,11 +131,11 @@ def run_pair(panel_sub, county_order, W_null_all, W_alt_all,
         {county_order[i] for i, r in enumerate(full_rs_alt)  if r == 0}
     )
 
-    na_all = panel_sub.groupby("fips5")["Linter_ela"].apply(lambda s: s.isna().all())
+    any_nan = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
     sub_co = set(panel_sub["fips5"].unique())
     usable = [
         c for c in county_order
-        if c in sub_co and not na_all.get(c, True) and c not in islands
+        if c in sub_co and not any_nan.get(c, True) and c not in islands
     ]
     N          = len(usable)
     usable_pos = {c: i for i, c in enumerate(usable)}
@@ -147,7 +149,7 @@ def run_pair(panel_sub, county_order, W_null_all, W_alt_all,
         .sort_values(["t_idx", "c_idx"])
     )
 
-    y_long       = df["Linter_ela"].values.reshape(-1, 1)
+    y_long       = df[DV].values.reshape(-1, 1)
     t_idx_vec    = df["t_idx"].values
     year_dummies = np.column_stack([
         (t_idx_vec == year_pos[yr]).astype(np.float64)
@@ -169,12 +171,12 @@ def run_pair(panel_sub, county_order, W_null_all, W_alt_all,
 
     res_null = spreg.Panel_FE_Error(
         y_long, x_long, w_null_pysal,
-        name_y="Linter_ela", name_x=nx,
+        name_y=DV, name_x=nx,
         name_w=w_null_label, name_ds=sample_label,
     )
     res_alt = spreg.Panel_FE_Error(
         y_long, x_long, w_alt_pysal,
-        name_y="Linter_ela", name_x=nx,
+        name_y=DV, name_x=nx,
         name_w=w_alt_label, name_ds=sample_label,
     )
 
@@ -244,7 +246,7 @@ def run(output_dir=None):
         )
     W_ng_all = row_standardize(scipy.sparse.load_npz(WBANK_NG_PATH))
 
-    panel = pd.read_csv(PANEL_PATH)
+    panel = load_panel_with_credit()
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
     YEARS    = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
@@ -314,9 +316,9 @@ def run(output_dir=None):
             "conclusion",
         ]
         pd.DataFrame(rows)[cols].to_csv(
-            output_dir / "jtest_results.csv", index=False
+            output_dir / "jtest_credit_results.csv", index=False
         )
-        print(f"\nSaved jtest_results.csv to {output_dir}")
+        print(f"\nSaved jtest_credit_results.csv to {output_dir}")
 
     return rows
 
