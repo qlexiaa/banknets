@@ -29,6 +29,9 @@ import rq1_four_w_comparison_credit
 import rq1_jtest
 import spatial_multiplier_decomposition
 import sar_robustness_credit
+import conley_se_comparison
+import sar_iv_credit
+import fgls_comparison
 
 
 def run_step(label, func):
@@ -50,7 +53,10 @@ def main():
     run_step("11. J-test, credit growth", lambda: rq1_jtest.run(OUTPUT_DIR))
     run_step("12. Composite W sweep, credit growth", lambda: rq1_composite_w.run(OUTPUT_DIR))
     run_step("13. Spatial multiplier decomposition", lambda: spatial_multiplier_decomposition.run(OUTPUT_DIR))
-    run_step("13. SAR robustness, credit growth",    lambda: sar_robustness_credit.run(OUTPUT_DIR))
+    run_step("14. SAR robustness, credit growth",    lambda: sar_robustness_credit.run(OUTPUT_DIR))
+    run_step("15. Conley HAC SE comparison",         lambda: conley_se_comparison.run(OUTPUT_DIR))
+    run_step("16. IV-SAR Kelejian-Prucha",            lambda: sar_iv_credit.run(OUTPUT_DIR))
+    run_step("17. FGLS comparison, credit growth",    lambda: fgls_comparison.run(OUTPUT_DIR))
 
 
 if __name__ == "__main__":
