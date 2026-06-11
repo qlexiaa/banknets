@@ -181,33 +181,65 @@ def meat_cluster_state(u_TN, x_TN, county_states):
     return B, G
 
 
-def meat_het_robust(u_TN, x_TN):
+def meat_twoway_overlap(u_TN, x_TN, W_sp, county_states):
     """
-    Heteroskedasticity-robust (HC) meat.
+    True overlap term for the Colella et al. (2019) two-way SE correction.
 
-    B_OLS = sum_{c,t}  u_ct^2 * x_tilde_ct^2
+    B_overlap = sum_t  sum_{c,c'} w_{cc'} * 1{state(c)==state(c')}
+                                          * u_ct u_{c't} x_ct x_{c't}
 
-    This is the diagonal-pair contribution that appears in both B_state
-    (within-state, same-county pairs) and B_spatial (only if w_cc > 0;
-    since W has zero diagonal, B_spatial does NOT include it).
-    Subtracted in the Colella et al. (2019) two-way formula to avoid
-    double-counting the state-diagonal term.
+    This is the part that BOTH B_state and B_spatial share: within-state
+    county pairs that are also spatially linked (w_{cc'} > 0).  Subtracting
+    B_overlap (rather than the HC diagonal B_OLS) avoids double-counting
+    these cross-county same-state contributions.
+
+    Key distinction from the previous B_OLS approach:
+      - B_OLS = sum_{c,t} u_ct^2 x_ct^2  (diagonal of W is zero, so spatial
+        meat has NO own-county contribution; B_OLS is the within-county term
+        that only B_state counts — not spatial).
+      - The actual double-counted region is within-state AND linked pairs,
+        i.e. B_overlap above, NOT B_OLS.
+      - Using B_OLS as the overlap therefore underestimates the subtraction,
+        potentially inflating the two-way SE when many within-state bank links
+        exist (dense W_bank for border-MSA counties sharing a state).
+
+    For W matrices with no within-state links (e.g. W_bank_interstate),
+    B_overlap = 0 and B_twoway = B_state + B_spatial exactly.
     """
-    return float(((u_TN * x_TN) ** 2).sum())
+    N = u_TN.shape[1]
+    # Build a within-state mask matrix (N x N), True if same state
+    same_state = (county_states[:, None] == county_states[None, :])  # (N, N) bool
+
+    # Element-wise mask of W: keep only within-state links
+    # W_sp is scipy sparse; convert to dense for element-wise product
+    W_dense  = W_sp.toarray()                          # (N, N)
+    W_masked = W_dense * same_state.astype(np.float64) # (N, N), within-state links only
+
+    B = 0.0
+    for t in range(u_TN.shape[0]):
+        v_t  = u_TN[t] * x_TN[t]    # (N,) score at period t
+        Wv_t = W_masked @ v_t        # (N,) spatial sum restricted to same state
+        B   += float(v_t @ Wv_t)
+    return B
 
 
-def meat_twoway(B_state, B_spatial_bank, B_het):
+def meat_twoway(B_state, B_spatial_bank, B_overlap):
     """
-    Colella et al. (2019) additive combination.
+    Colella et al. (2019) additive two-way combination with correct overlap.
 
-    B_twoway = B_state + B_spatial(W_bank) - B_OLS
+    B_twoway = B_state + B_spatial(W_bank) - B_overlap
 
-    B_OLS is subtracted because:
-      - B_state includes the diagonal (within-county, within-state) contribution
-      - B_spatial excludes it (W has zero diagonal)
-      - Adding both would double-count same-county-same-period pairs
+    B_overlap is the contribution that appears in BOTH B_state (all within-state
+    pairs, summed over time) and B_spatial (all w_{cc'}>0 pairs).  Their
+    intersection is: pairs that are BOTH in the same state AND spatially linked.
+    Subtracting B_overlap once gives the union without double-counting.
+
+    Note: the spatial kernel W has zero diagonal, so own-county pairs are
+    in B_state but NOT in B_spatial — the naive subtraction of B_OLS
+    (which equals the own-county diagonal sum) is incorrect because it
+    removes a term that was never in B_spatial.
     """
-    return B_state + B_spatial_bank - B_het
+    return B_state + B_spatial_bank - B_overlap
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -338,21 +370,26 @@ def compute_all_ses(s):
     k    = 1              # one regressor excluding FE
 
     # -- Compute raw meats ----------------------------------------------------
-    B_het            = meat_het_robust(u, x)
     B_geo            = meat_spatial(u, x, s["W_geo"])
     B_bank           = meat_spatial(u, x, s["W_bank"])
     B_state, G       = meat_cluster_state(u, x, s["county_states"])
-    B_two            = meat_twoway(B_state, B_bank, B_het)
+    # True overlap: within-state AND spatially linked pairs
+    B_overlap        = meat_twoway_overlap(u, x, s["W_bank"], s["county_states"])
+    # Old overlap (diagonal / HC): kept for se_twoway_old column
+    B_het            = float(((u * x) ** 2).sum())
+    B_two            = meat_twoway(B_state, B_bank, B_overlap)
+    B_two_old        = B_state + B_bank - B_het  # previous (incorrect) formula
 
     # -- DF corrections -------------------------------------------------------
     dfc = df_cluster(G)        # G/(G-1)           -- for cluster estimators
     dfh = df_conley(NT, k)     # NT/(NT-k-1)       -- for Conley HAC
 
     # -- Standard errors ------------------------------------------------------
-    se_state = sandwich_se(XtX, B_state, dfc)
-    se_geo   = sandwich_se(XtX, B_geo,   dfh)
-    se_bank  = sandwich_se(XtX, B_bank,  dfh)
-    se_two   = sandwich_se(XtX, max(B_two, 0.0), dfc)  # cluster DF for twoway
+    se_state   = sandwich_se(XtX, B_state, dfc)
+    se_geo     = sandwich_se(XtX, B_geo,   dfh)
+    se_bank    = sandwich_se(XtX, B_bank,  dfh)
+    se_two     = sandwich_se(XtX, max(B_two, 0.0), dfc)     # cluster DF for twoway
+    se_two_old = sandwich_se(XtX, max(B_two_old, 0.0), dfc) # old formula (B_OLS overlap)
 
     # -- CIs, t-stats, p-values (normal approximation) -----------------------
     z_crit = st.norm.ppf(0.975)   # 1.96
@@ -367,16 +404,18 @@ def compute_all_ses(s):
                     ci_width=hi - lo,
                     t_stat=tval, p_value=pval)
 
+    r_two = build_row(se_two)
+    r_two["se_twoway_old"] = se_two_old
     result = {
         "State clustering (Favara-Imbs)": build_row(se_state),
         "Spatial HAC W_geo":              build_row(se_geo),
         "Spatial HAC W_bank":             build_row(se_bank),
-        "State + Spatial HAC W_bank":     build_row(se_two),
+        "State + Spatial HAC W_bank":     r_two,
     }
     result["_meta"] = dict(
         N=s["N"], T=s["T"], G=G,
         B_het=B_het, B_geo=B_geo, B_bank=B_bank,
-        B_state=B_state, B_two=B_two,
+        B_state=B_state, B_overlap=B_overlap, B_two=B_two, B_two_old=B_two_old,
         dfc=dfc, dfh=dfh,
     )
     return result
@@ -489,10 +528,10 @@ def run(output_dir=None):
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
     YEARS    = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
-    panel_border    = panel[panel["border"] == 1].copy()
-    panel_nonborder = panel[panel["border"] == 0].copy()
+    panel_contig    = panel[panel["border"] == 1].copy()
+    panel_noncontig = panel[panel["border"] == 0].copy()
 
-    samples = [("Full", panel), ("Border", panel_border), ("NonBorder", panel_nonborder)]
+    samples = [("Full", panel), ("Contig", panel_contig), ("NonContig", panel_noncontig)]
 
     # -- Estimate + compute SEs for each sample -------------------------------
     all_results = {}
@@ -509,7 +548,7 @@ def run(output_dir=None):
         m = res["_meta"]
         print(f"  G={m['G']} states | B_state={m['B_state']:.4f} | "
               f"B_geo={m['B_geo']:.4f} | B_bank={m['B_bank']:.4f} | "
-              f"B_het={m['B_het']:.4f}")
+              f"B_overlap={m['B_overlap']:.4f} | B_two={m['B_two']:.4f}")
 
     # -- Print formatted tables -----------------------------------------------
     W = 76
@@ -533,15 +572,16 @@ def run(output_dir=None):
             print(f"  {label:<34} {r['beta']:8.4f}  "
                   f"{r['se']:7.4f}  {ci:>20}  {r['ci_width']:8.4f}")
             csv_rows.append(dict(
-                sample    = slabel,
-                estimator = label,
-                beta      = r["beta"],
-                se        = r["se"],
-                ci_lower  = r["ci_lower"],
-                ci_upper  = r["ci_upper"],
-                ci_width  = r["ci_width"],
-                t_stat    = r["t_stat"],
-                p_value   = r["p_value"],
+                sample        = slabel,
+                estimator     = label,
+                beta          = r["beta"],
+                se            = r["se"],
+                se_twoway_old = r.get("se_twoway_old", float("nan")),
+                ci_lower      = r["ci_lower"],
+                ci_upper      = r["ci_upper"],
+                ci_width      = r["ci_width"],
+                t_stat        = r["t_stat"],
+                p_value       = r["p_value"],
             ))
 
         print("-" * W)
@@ -562,7 +602,7 @@ def run(output_dir=None):
 
     # -- Save CSV -------------------------------------------------------------
     if output_dir is not None:
-        cols = ["sample", "estimator", "beta", "se",
+        cols = ["sample", "estimator", "beta", "se", "se_twoway_old",
                 "ci_lower", "ci_upper", "ci_width", "t_stat", "p_value"]
         pd.DataFrame(csv_rows)[cols].to_csv(
             output_dir / "conley_se_comparison.csv", index=False)

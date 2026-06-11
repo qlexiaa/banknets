@@ -16,8 +16,6 @@ The core comparison is between seven spatial weight specifications:
 - `W_bank_interstate`: cross-state bank links only
 - `W_bank_intrastate`: within-state bank links only
 
-House-price growth is kept as a companion reduced-form check.
-
 ## Repository Layout
 
 ```text
@@ -29,7 +27,7 @@ analysis/
   w_variants.py                      Centralised W matrix catalogue (all 7 bank variants)
 
   diagnostics/
-    moran_baseline.py                Baseline Moran's I under W_geo, credit and HPI
+    moran_baseline.py                Baseline Moran's I under W_geo, credit
     moran_bank_variants.py           Moran's I under W_bank variants and KNN truncations
     network_overlap.py               Bank-geography top-link overlap diagnostics
 
@@ -175,7 +173,7 @@ Diagnostic outputs are in `output/diagnostics/`.
 
 ## References
 
-- Favara, G. and Imbs, J. (2015). Credit Supply and the Price of Housing. *American Economic Review*, 105(3), 958–992.
+- Favara, G. and Imbs, J. (2015). *American Economic Review*, 105(3), 958–992.
 - Kelejian, H. H. and Prucha, I. R. (1998). A generalized spatial two-stage least squares procedure for estimating a spatial autoregressive model with autoregressive disturbances. *Journal of Real Estate Finance and Economics*, 17(1), 99–121.
 - LeSage, J. and Pace, R. K. (2009). *Introduction to Spatial Econometrics*. CRC Press.
 - Conley, T. G. (1999). GMM estimation with cross sectional dependence. *Journal of Econometrics*, 92(1), 1–45.

@@ -38,6 +38,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from utils import row_standardize
 from w_variants import load_w_geo, load_bank_variants
+from panel_data import load_panel_with_credit
 
 ROOT             = Path(__file__).parents[2]
 COUNTY_PATH      = ROOT / "data" / "county_order_Wgeo.csv"
@@ -73,7 +74,7 @@ def load_lambdas():
     lam = {}
     cr  = pd.read_csv(CREDIT_CSV)
 
-    for sample_tag in ["full", "border", "nonborder"]:
+    for sample_tag in ["full", "contig", "noncontig"]:
         for w_tag in ["W_geo", "W_bank"]:
             mask = (cr["model"].str.contains(w_tag, regex=False) &
                     cr["model"].str.contains(f"({sample_tag})", regex=False))
@@ -268,7 +269,7 @@ def run(output_dir=None):
         print(f"  {k[0]:8s} {k[1]:8s}  lambda = {v:.6f}  "
               f"total multiplier = {1/(1-v):.4f}x")
 
-    print("\nLoading W matrices ...")
+    print("\nLoading W matrices and panel ...")
     co_df        = pd.read_csv(COUNTY_PATH, dtype={"fips5": str})
     county_order = co_df["fips5"].str.zfill(5).tolist()
     N            = len(county_order)
@@ -279,6 +280,25 @@ def run(output_dir=None):
     W_bank_sp   = bank_vars["W_bank"]
 
     W_MATS = {"W_geo": W_geo_sp, "W_bank": W_bank_sp}
+
+    panel = load_panel_with_credit()
+    panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
+
+    # Usable county set per sample: drop any-NaN counties for each sub-panel
+    def _usable_counties(panel_sub):
+        any_nan = panel_sub.groupby("fips5")["Dl_nloans_b"].apply(
+            lambda s: s.isna().any())
+        sub_co = set(panel_sub["fips5"].unique())
+        return [c for c in county_order
+                if c in sub_co and not any_nan.get(c, True)]
+
+    SAMPLE_COUNTIES = {
+        "full":     _usable_counties(panel),
+        "contig":   _usable_counties(panel[panel["border"] == 1]),
+        "noncontig":_usable_counties(panel[panel["border"] == 0]),
+    }
+    for stag, co_list in SAMPLE_COUNTIES.items():
+        print(f"  {stag}: {len(co_list)} usable counties")
 
     print("\nLoading / downloading county centroids ...")
     centroid_result = load_centroids(county_order)
@@ -301,10 +321,10 @@ def run(output_dir=None):
     COMBOS = [
         ("credit", "W_geo",  "full"),
         ("credit", "W_bank", "full"),
-        ("credit", "W_geo",  "border"),
-        ("credit", "W_bank", "border"),
-        ("credit", "W_geo",  "nonborder"),
-        ("credit", "W_bank", "nonborder"),
+        ("credit", "W_geo",  "contig"),
+        ("credit", "W_bank", "contig"),
+        ("credit", "W_geo",  "noncontig"),
+        ("credit", "W_bank", "noncontig"),
     ]
 
     for outcome, w_label, sample_tag in COMBOS:
@@ -312,15 +332,23 @@ def run(output_dir=None):
         if key not in lam_dict:
             print(f"  [SKIP] lambda not found for {key}")
             continue
-        lam    = lam_dict[key]
-        W_sp   = W_MATS[w_label]
+        lam     = lam_dict[key]
+        W_sp    = W_MATS[w_label]
+        co_samp = SAMPLE_COUNTIES.get(sample_tag, county_order)
 
         print(f"\n{'='*60}")
         print(f"  {outcome.upper()} | {w_label} | {sample_tag}  lambda={lam:.6f}")
         print(f"{'='*60}")
 
-        # Drop zero-row counties (structural islands in this W) before inversion
-        W_sp_sub, co_sub = drop_zero_rows(W_sp, county_order)
+        # Subset W to the sample counties first (so the centroid/reach lookup
+        # uses the correct county set), then drop zero-row structural islands.
+        # This is the fix for missing avg-reach in sample-specific combos:
+        # previously drop_zero_rows used the full county_order, so for contig/
+        # noncontig the reach was computed over all non-island counties rather
+        # than just those in the sample.
+        idx_samp    = np.array([county_order.index(c) for c in co_samp])
+        W_sp_samp   = W_sp[idx_samp, :][:, idx_samp].tocsr()
+        W_sp_sub, co_sub = drop_zero_rows(W_sp_samp, co_samp)
         N_sub   = len(co_sub)
         W_dense = W_sp_sub.toarray().astype(np.float64)
 
@@ -345,7 +373,8 @@ def run(output_dir=None):
 
         # ── 2. Geographic / hop reach ─────────────────────────────────────────
         if dist_matrix is not None:
-            # Align distance matrix to the (possibly subsetted) county list
+            # Align distance matrix to co_sub (subset of county_order)
+            # county_order is the full master list; dist_matrix is also aligned to it
             idx_sub  = np.array([county_order.index(c) for c in co_sub])
             dist_sub = dist_matrix[np.ix_(idx_sub, idx_sub)]
             off_row_sums = S_off.sum(axis=1)

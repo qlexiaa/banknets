@@ -2,6 +2,7 @@
 run_all.py -- Credit-growth spatial-econometric pipeline.
 
 Main dependent variable: Dl_nloans_b (credit growth).
+Samples: Full, Contig (border==1), NonContig (border==0).
 """
 from pathlib import Path
 import sys
@@ -15,10 +16,11 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(ANALYSIS_DIR))
 
 from diagnostics import moran_baseline, moran_bank_variants, network_overlap
+from diagnostics import w_density_summary
 from extensions import multiplier_counterfactual, slx_exposure
 from inference import conley_se, fgls
 from model_selection import composite_w, jtest, lm_tests
-from sar import multiplier_decomposition, sar_credit, sar_iv_credit
+from sar import multiplier_decomposition, sar_credit
 from sem import (
     sem_credit,
     sem_knn_sweep,
@@ -39,24 +41,24 @@ def main():
              lambda: moran_bank_variants.run(OUTPUT_DIR))
     run_step("3. Bank-geography link overlap",
              lambda: network_overlap.run(OUTPUT_DIR))
-    run_step("4. LM error/lag diagnostics, credit DV",
+    run_step("4. W matrix density summary",
+             lambda: w_density_summary.run(OUTPUT_DIR))
+    run_step("5. LM error/lag diagnostics, credit DV",
              lambda: lm_tests.run(OUTPUT_DIR))
-    run_step("5. Main Panel_FE_Error: W_geo vs W_bank",
+    run_step("6. Main Panel_FE_Error: W_geo vs W_bank",
              lambda: sem_credit.run(OUTPUT_DIR))
-    run_step("6. W_geo / W_bank_bin / W_bank_count / W_bank_nonGeo",
+    run_step("7. W_geo / W_bank_bin / W_bank_count / W_bank_nonGeo",
              lambda: sem_w_variants.run(OUTPUT_DIR))
-    run_step("7. nonGeo / interstate / intrastate restrictions",
+    run_step("8. nonGeo / interstate / intrastate restrictions",
              lambda: sem_link_restrictions.run(OUTPUT_DIR))
-    run_step("8. KNN sweep k = 1..20",
+    run_step("9. KNN sweep k = 1..20",
              lambda: sem_knn_sweep.run(OUTPUT_DIR))
-    run_step("9. Davidson-MacKinnon J-tests",
+    run_step("10. Davidson-MacKinnon J-tests",
              lambda: jtest.run(OUTPUT_DIR))
-    run_step("10. Composite W(alpha) profile-likelihood sweep",
+    run_step("11. Composite W(alpha) profile-likelihood sweep",
              lambda: composite_w.run(OUTPUT_DIR))
-    run_step("11. Panel_FE_Lag robustness",
+    run_step("12. Panel_FE_Lag robustness",
              lambda: sar_credit.run(OUTPUT_DIR))
-    run_step("12. IV-SAR (Kelejian & Prucha 1998)",
-             lambda: sar_iv_credit.run(OUTPUT_DIR))
     run_step("13. Direct/indirect effects, distance decay",
              lambda: multiplier_decomposition.run(OUTPUT_DIR))
     run_step("14. SE estimator comparison (Conley 1999; Colella et al. 2019)",

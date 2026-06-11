@@ -122,7 +122,7 @@ def _make_plot(csv_rows, output_dir):
     One column per sample (Full, Border), three grouped bars per W variant.
     """
     df = pd.DataFrame(csv_rows)
-    sample_order = ["Full", "Border", "NonBorder"]
+    sample_order = ["Full", "Contig", "NonContig"]
     samples = [s for s in sample_order if s in set(df["sample"])]
     n_sam   = len(samples)
 

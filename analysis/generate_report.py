@@ -12,7 +12,7 @@ For each analysis the report documents:
   3. Key estimation assumptions
   4. Results (formatted tables)
 
-New result CSVs are picked up automatically — sections whose CSV is missing
+New result CSVs are picked up automatically -- sections whose CSV is missing
 are skipped and noted at the bottom.
 """
 
@@ -29,7 +29,7 @@ DIAG = OUT / "diagnostics"
 
 def fmt(x, decimals=4):
     if pd.isna(x):
-        return "—"
+        return "--"
     if isinstance(x, (int, np.integer)):
         return f"{x:,}"
     try:
@@ -44,30 +44,37 @@ def fmt(x, decimals=4):
 
 def stars(p):
     try:
-        p = float(p)
-        if p < 0.01:  return "***"
-        if p < 0.05:  return "**"
-        if p < 0.10:  return "*"
+        pf = float(p)
+        if pd.isna(pf):
+            return ""
+        if pf < 0.01:  return "***"
+        if pf < 0.05:  return "**"
+        if pf < 0.10:  return "*"
         return ""
     except (TypeError, ValueError):
         return ""
 
 def pval_str(p):
     try:
-        p = float(p)
-        if p < 0.001: return "<0.001"
-        return f"{p:.3f}"
+        pf = float(p)
+        if pd.isna(pf):
+            return "--"
+        if pf < 0.001: return "<0.001"
+        return f"{pf:.3f}"
     except (TypeError, ValueError):
         return str(p)
 
 def fmti(x):
-    """Safe integer formatter — returns '—' for NaN/None."""
+    """Safe integer formatter -- returns '--' for NaN/None."""
     try:
         if pd.isna(x):
-            return "—"
+            return "--"
         return f"{int(x):,}"
     except (TypeError, ValueError):
         return str(x)
+
+# alias
+safe_int = fmti
 
 def load(path):
     p = Path(path)
@@ -107,56 +114,56 @@ def sec_panel_fe_credit():
     df = load(OUT / "panel_fe_credit_results.csv")
     if df is None:
         return ""
-    s = section("1. Main SEM — Credit Growth")
+    s = section("1. Main SEM -- Credit Growth")
 
     s += """
 **Source:** `analysis/sem/sem_credit.py`
 
-**References:** Anselin (1988) *Spatial Econometrics*; Anselin et al. (2008) *A Local Indicator of Spatial Association*; Favara & Imbs (2015) *Credit Supply and the Price of Housing*
+**References:** Anselin (1988) *Spatial Econometrics*; Anselin et al. (2008) *A Local Indicator of Spatial Association*; Favara & Imbs (2015)
 
 ---
 
 **Structural equation (Spatial Error Model):**
 
 ```
-Δln(loans)_it = β · Linter_bra_it + α_i + τ_t + u_it        ...(1)
-u_it = λ · (W u)_it + ε_it                                    ...(2)
+delta_ln(loans)_it = beta * Linter_bra_it + a_i + tau_t + u_it        ...(1)
+u_it = lambda * (W u)_it + eps_it                                      ...(2)
 ```
 
 where:
-- `Δln(loans)_it` = log-change in commercial-bank mortgage loans (Favara-Imbs HMDA), county *i*, year *t*
-- `Linter_bra_it` = cumulative interstate branching deregulation index (sum of indicator variables for each bilateral pair state deregulated)
-- `α_i` = county fixed effect; `τ_t` = year fixed effect
+- `delta_ln(loans)_it` = log-change in commercial-bank mortgage loans (Favara-Imbs HMDA), county i, year t
+- `Linter_bra_it` = cumulative interstate branching deregulation index
+- `a_i` = county fixed effect; `tau_t` = year fixed effect
 - `W` = row-standardised spatial weight matrix (two variants compared)
-- `λ` = spatial error autocorrelation parameter; `ε_it` ~ i.i.d.(0, σ²)
+- `lambda` = spatial error autocorrelation parameter; `eps_it` ~ i.i.d.(0, sigma^2)
 
 Reduced form obtained by substituting (2) into (1):
 
 ```
-Δln(loans)_it = β · Linter_bra_it + α_i + τ_t + (I - λW)⁻¹ ε_it
+delta_ln(loans)_it = beta * Linter_bra_it + a_i + tau_t + (I - lambdaW)^{-1} eps_it
 ```
 
-**Estimation:** Maximum likelihood via `spreg.Panel_FE_Error` (Anselin et al. 2008). Log-likelihood for a single period under normality:
+**Estimation:** Maximum likelihood via `spreg.Panel_FE_Error` (Anselin et al. 2008). Log-likelihood under normality:
 
 ```
-ln L = -(NT/2) ln(2πσ²) + T ln|I - λW| - (1/2σ²) ε'ε
+ln L = -(NT/2) ln(2 pi sigma^2) + T ln|I - lambda W| - (1/2 sigma^2) eps'eps
 ```
 
-where `ε = (I - λW) · ũ` and `ũ` are two-way FE within-demeaned residuals.
+where `eps = (I - lambda W) * u_tilde` and `u_tilde` are two-way FE within-demeaned residuals.
 
-**Two-way within (FE) transformation** (applied before ML, following Mundlak 1978):
-
-```
-z̃_it = z_it - z̄_i - z̄_t + z̄      ...(3)
-```
-
-where `z̄_i` = county mean, `z̄_t` = year mean, `z̄` = grand mean.
-
-**Gap test** (H₁: λ_bank > λ_geo, one-sided):
+**Two-way within (FE) transformation** (Mundlak 1978):
 
 ```
-z_gap = (λ̂_bank - λ̂_geo) / sqrt(SE(λ̂_bank)² + SE(λ̂_geo)²)    ...(4)
-p = Φ(-z_gap)   (normal tail)
+z_tilde_it = z_it - z_bar_i - z_bar_t + z_bar      ...(3)
+```
+
+where `z_bar_i` = county mean, `z_bar_t` = year mean, `z_bar` = grand mean.
+
+**Gap test** (H1: lambda_bank > lambda_geo, one-sided):
+
+```
+z_gap = (lambda_hat_bank - lambda_hat_geo) / sqrt(SE(lambda_hat_bank)^2 + SE(lambda_hat_geo)^2)    ...(4)
+p = Phi(-z_gap)   (normal tail)
 ```
 
 Note: SE(gap) ignores the covariance between estimators (conservative).
@@ -165,7 +172,10 @@ Note: SE(gap) ignores the covariance between estimators (conservative).
 - **W_geo**: queen contiguity (binary adjacency, row-standardised)
 - **W_bank**: time-averaged cosine similarity of county bank holding-company portfolios (Favara & Imbs 2015, Data Appendix)
 
-**NaN policy:** Counties with any missing year in `Δln(loans)` are dropped entirely (67 counties), ensuring a strictly balanced panel required by `Panel_FE_Error`.
+**Sample definitions:**
+- **Full**: all counties with complete data
+- **Contig**: counties sharing a geographic border with at least one other county (border==1)
+- **NonContig**: non-contiguous counties (border==0)
 
 **Results:**
 
@@ -174,68 +184,13 @@ Note: SE(gap) ignores the covariance between estimators (conservative).
     for _, r in df.iterrows():
         rows.append({
             "Model": r.get("model", f"{r.get('w_matrix','')} ({r.get('sample','')})"),
-            "β (deregulation)": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
-            "λ (spatial)": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
-            "N counties": fmti(r["n_co"]),
-            "N obs": fmti(r["n_obs"]),
+            "beta (deregulation)": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
+            "lambda (spatial)": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
+            "N counties": safe_int(r["n_co"]),
+            "N obs": safe_int(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     s += "\n*Standard errors in parentheses. \\*p<0.10, \\*\\*p<0.05, \\*\\*\\*p<0.01*\n"
-    return s
-
-
-def sec_panel_fe_hpi():
-    df = load(OUT / "panel_fe_hpi_results.csv")
-    if df is None:
-        return ""
-    s = section("2. Main SEM — House Price Growth")
-
-    s += """
-**Source:** `analysis/sem/sem_hpi.py`
-
-**References:** Favara & Imbs (2015); Anselin et al. (2008)
-
----
-
-**Structural equation:**
-
-```
-Δln(HPI)_it = β_D · Linter_bra_it + β_Dη · Linter_ela_it
-             + γ · Controls_it + α_i + τ_t + u_it        ...(5)
-u_it = λ · (W u)_it + ε_it                               ...(6)
-```
-
-where:
-- `Δln(HPI)_it` = log-change in house price index (OFHEO/FHFA)
-- `Linter_bra_it` = interstate deregulation index (same as §1)
-- `Linter_ela_it` = within-state (intrastate) deregulation index
-- `Controls_it` ∈ {LΔln(HPI), Δln(pop), LΔln(pop), Δln(inc), LΔln(inc), Δln(hsosf), LΔln(hsosf)}
-- Prefix L = one-year lag
-
-**Estimation:** Same ML as §1 (eq. ln L above). Estimated **unweighted** — Favara & Imbs (2015) weight HPI regressions by 1/(counties per state) but `spreg.Panel_FE_Error` does not support observation weights, so this SEM is unweighted.
-
-**Two-way within transformation:** Equation (3) above, applied to all variables.
-
-**Lambda gap test:** Equation (4) above, `Δλ = λ_bank - λ_geo`.
-
-**Results:**
-
-"""
-    rows = []
-    for _, r in df.iterrows():
-        gap_str = ""
-        if pd.notna(r.get("delta_lambda", np.nan)) and not pd.isna(r.get("delta_lambda")):
-            gap_str = f"{fmt(r['delta_lambda'])} ({fmt(r['delta_lambda_se'])}){stars(0.0001)}"
-        rows.append({
-            "Sample / W": f"{r['sample']} / {r['w_matrix']}",
-            "β_D": f"{fmt(r['beta_D'])} ({fmt(r['beta_D_se'])}){stars(0.001)}",
-            "β_Dη": f"{fmt(r['beta_Deta'])} ({fmt(r['beta_Deta_se'])}){stars(0.001)}",
-            "λ": f"{fmt(r['lambda'])} ({fmt(r['lambda_se'])}){stars(0.001)}",
-            "Δλ (bank−geo)": gap_str if gap_str else "—",
-            "N counties": fmti(r["n_counties"]),
-        })
-    s += md_table(pd.DataFrame(rows))
-    s += "\n*Standard errors in parentheses.*\n"
     return s
 
 
@@ -243,7 +198,7 @@ def sec_four_w():
     df = load(OUT / "four_w_comparison_credit.csv")
     if df is None:
         return ""
-    s = section("3. Four-W Comparison — Credit Growth")
+    s = section("2. Four-W Comparison -- Credit Growth")
 
     s += """
 **Source:** `analysis/sem/sem_w_variants.py`
@@ -252,17 +207,17 @@ def sec_four_w():
 
 ---
 
-**Model:** Same as §1, equations (1)–(2).
+**Model:** Same as section 1, equations (1)-(2).
 
 **Gap test** (one-sided z, same as equation (4)):
 ```
-z_gap = (λ̂_alt - λ̂_geo) / sqrt(SE(λ̂_alt)² + SE(λ̂_geo)²)
-p_gap = Φ(-z_gap)
+z_gap = (lambda_hat_alt - lambda_hat_geo) / sqrt(SE(lambda_hat_alt)^2 + SE(lambda_hat_geo)^2)
+p_gap = Phi(-z_gap)
 ```
 
 **Likelihood-ratio test** (also reported):
 ```
-LR = 2 · (logLL_alt - logLL_geo) ~ χ²(1) under H₀
+LR = 2 * (logLL_alt - logLL_geo) ~ chi^2(1) under H0
 ```
 
 **Spatial weight matrices compared:**
@@ -281,17 +236,17 @@ LR = 2 · (logLL_alt - logLL_geo) ~ χ²(1) under H₀
     rows = []
     for _, r in df.iterrows():
         gap_str = f"{fmt(r['gap_vs_geo'])} (z={fmt(r['z_gap'], 2)}){stars(r['p_gap_onesided'])}" \
-            if pd.notna(r.get("gap_vs_geo", np.nan)) and not pd.isna(r.get("gap_vs_geo")) else "—"
+            if pd.notna(r.get("gap_vs_geo", np.nan)) and not pd.isna(r.get("gap_vs_geo")) else "--"
         rows.append({
             "Sample": r["sample"],
             "W matrix": r["w_matrix"],
-            "β": f"{fmt(r['beta'])} ({fmt(r['se_beta'])}){stars(r['p_beta'])}",
-            "λ": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
-            "Δλ vs W_geo": gap_str,
-            "N obs": fmti(r["n_obs"]),
+            "beta": f"{fmt(r['beta'])} ({fmt(r['se_beta'])}){stars(r['p_beta'])}",
+            "lambda": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
+            "delta_lambda vs W_geo": gap_str,
+            "N obs": safe_int(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
-    s += "\n*Standard errors in parentheses. Gap is one-sided z-test (H₁: λ_alt > λ_geo).*\n"
+    s += "\n*Standard errors in parentheses. Gap is one-sided z-test (H1: lambda_alt > lambda_geo).*\n"
     return s
 
 
@@ -299,7 +254,7 @@ def sec_composite_credit():
     opt = load(OUT / "composite_w_credit_optima.csv")
     if opt is None:
         return ""
-    s = section("4. Composite W Profile — Credit Growth")
+    s = section("3. Composite W Profile -- Credit Growth")
 
     s += """
 **Source:** `analysis/model_selection/composite_w.py`
@@ -311,21 +266,22 @@ def sec_composite_credit():
 **Profile likelihood over convex combinations of W matrices:**
 
 ```
-W_combo(α) = α · W_geo + (1 - α) · W_alt       ...(7)
+W_combo(alpha) = alpha * W_geo + (1 - alpha) * W_alt       ...(7)
 ```
 
-where α ∈ {0, 0.05, 0.10, …, 1.0} (21-point grid). For each α, `W_combo` is row-standardised before estimation.
+where alpha in {0, 0.05, 0.10, ..., 1.0} (21-point grid). For each alpha, `W_combo` is row-standardised before estimation.
 
-The model at each grid point is the same SEM as §1, equations (1)–(2), but with `W = W_combo(α)`.
+The model at each grid point is the same SEM as section 1, equations (1)-(2), but with `W = W_combo(alpha)`.
 
-**Optimum:** α* = argmax_α logLL(α)
+**Optimum:** alpha* = argmax_alpha logLL(alpha)
 
 **Log-likelihood improvement:**
 ```
-ΔlogLL = logLL(α*) - max(logLL_geo, logLL_bank)     ...(8)
+delta_logLL = logLL(alpha*) - max(logLL_geo, logLL_bank)     ...(8)
 ```
 
-Interpretation: α* = 1 → pure geographic; α* = 0 → pure bank-network.
+Interpretation: alpha* = 1 -> pure geographic; alpha* = 0 -> pure bank-network.
+When alpha* is at an endpoint, delta_logLL = 0 by construction (clamped).
 
 **Pairs profiled:**
 - **Pair A**: W_geo vs W_bank (continuous cosine)
@@ -341,13 +297,13 @@ Interpretation: α* = 1 → pure geographic; α* = 0 → pure bank-network.
             "Pair": r["pair"],
             "W_alt": r["w_alt"],
             "Sample": r["sample"],
-            "α*": fmt(r["alpha_star"]),
-            "λ at α*": f"{fmt(r['lam_at_star'])} ({fmt(r['se_lam_at_star'])})",
-            "β at α*": f"{fmt(r['beta_at_star'])} ({fmt(r['se_beta_at_star'])})",
-            "ΔlogLL": fmt(r["logll_improvement"], 1),
+            "alpha*": fmt(r["alpha_star"]),
+            "lambda at alpha*": f"{fmt(r['lam_at_star'])} ({fmt(r['se_lam_at_star'])})",
+            "beta at alpha*": f"{fmt(r['beta_at_star'])} ({fmt(r['se_beta_at_star'])})",
+            "delta_logLL": fmt(r["logll_improvement"], 1),
         })
     s += md_table(pd.DataFrame(rows))
-    s += "\n*α* = 1: pure W_geo; α* = 0: pure W_bank. ΔlogLL = improvement over best single-W endpoint.*\n"
+    s += "\n*alpha* = 1: pure W_geo; alpha* = 0: pure W_bank. delta_logLL = improvement over best single-W endpoint.*\n"
     return s
 
 
@@ -355,7 +311,7 @@ def sec_jtest():
     df = load(OUT / "jtest_credit_results.csv")
     if df is None:
         return ""
-    s = section("5. J-Test — Non-Nested Model Selection")
+    s = section("4. J-Test -- Non-Nested Model Selection")
 
     s += """
 **Source:** `analysis/model_selection/jtest.py`
@@ -369,27 +325,27 @@ def sec_jtest():
 **Spatial prediction component** (from fitted SEM residuals):
 
 ```
-m̂ = λ̂ · W · û = û - ê_filtered      ...(9)
+m_hat = lambda_hat * W * u_hat = u_hat - e_filtered      ...(9)
 ```
 
-where `û` are within-demeaned OLS residuals and `ê_filtered = (I - λ̂W)û` are the spatially-filtered residuals stored in `res.e_filtered`.
+where `u_hat` are within-demeaned OLS residuals and `e_filtered = (I - lambda_hat W)u_hat` are the spatially-filtered residuals.
 
-**J-test direction** (H₀: W_null, H₁: W_alt):
+**J-test direction** (H0: W_null, H1: W_alt):
 
 ```
-Step 1: Estimate SEM under W_alt → extract m̂_alt via (9)
-Step 2: Augment regressor matrix: X_aug = [X | m̂_alt]     ...(10)
+Step 1: Estimate SEM under W_alt -> extract m_hat_alt via (9)
+Step 2: Augment regressor matrix: X_aug = [X | m_hat_alt]     ...(10)
 Step 3: Estimate SEM under W_null with (y, X_aug)
-Step 4: J-statistic = z-ratio on the coefficient of m̂_alt in Step 3
+Step 4: J-statistic = z-ratio on the coefficient of m_hat_alt in Step 3
 ```
 
-Both directions are tested for each W pair (H₀=W_null, H₁=W_alt) and (H₀=W_alt, H₁=W_null).
+Both directions are tested for each W pair.
 
 **Decision rule:**
-- Direction 1 rejects only → W_alt preferred
-- Direction 2 rejects only → W_null preferred
-- Both reject → Indeterminate (both W specifications capture independent spatial structure)
-- Neither rejects → Indeterminate (neither is informative)
+- Direction 1 rejects only -> W_alt preferred
+- Direction 2 rejects only -> W_null preferred
+- Both reject -> Indeterminate
+- Neither rejects -> Indeterminate
 
 **Results:**
 
@@ -405,7 +361,7 @@ Both directions are tested for each W pair (H₀=W_null, H₁=W_alt) and (H₀=W
             "Conclusion": r["conclusion"],
         })
     s += md_table(pd.DataFrame(rows))
-    s += "\n*\\*\\*\\* p<0.01. Both directions significant → neither W matrix dominates.*\n"
+    s += "\n*\\*\\*\\* p<0.01. Both directions significant -> neither W matrix dominates.*\n"
     return s
 
 
@@ -413,48 +369,36 @@ def sec_lm_diag():
     df = load(OUT / "lm_diagnostics_credit.csv")
     if df is None:
         return ""
-    s = section("6. LM Diagnostics — Credit OLS Residuals")
+    s = section("5. LM Diagnostics -- Credit OLS Residuals")
 
     s += """
 **Source:** `analysis/model_selection/lm_tests.py`
 
-**References:** Anselin (1988) §12; Anselin et al. (1996) *Simple Diagnostic Tests for Spatial Dependence*; Burridge (1980)
+**References:** Anselin (1988) section 12; Anselin et al. (1996) *Simple Diagnostic Tests for Spatial Dependence*; Burridge (1980)
 
 ---
 
-**Pre-estimation:** Apply the **two-way within transformation** (eq. 3) to all variables so that OLS residuals match the two-way FE mean specification in §1.
-
-**OLS residuals (two-way FE):**
-
-```
-Δln(loans)̃_it = β̂_OLS · L̃inter_bra_it + ũ_it
-```
+**Pre-estimation:** Apply the **two-way within transformation** (eq. 3) to all variables so that OLS residuals match the two-way FE mean specification in section 1.
 
 **LM error statistic** (Anselin 1988, eq. 12.7):
 
 ```
-LM_error = [ũ'Wu / σ̂²]² / tr(W'W + W²)      ...(11)
+LM_error = [u_tilde'Wu / sigma_hat^2]^2 / tr(W'W + W^2)      ...(11)
 ```
 
-under H₀: λ = 0, LM_error ~ χ²(1).
+under H0: lambda = 0, LM_error ~ chi^2(1).
 
 **LM lag statistic** (Anselin et al. 1996):
 
 ```
-LM_lag = [ũ'Wỹ / σ̂²]² / [(WXβ̂)'M(Wβ̂X)/σ̂² + tr(W'W + W²)]      ...(12)
+LM_lag = [u_tilde'Wy_tilde / sigma_hat^2]^2 / [(WXbeta_hat)'M(Wbeta_hat X)/sigma_hat^2 + tr(W'W + W^2)]      ...(12)
 ```
 
-under H₀: ρ = 0, LM_lag ~ χ²(1).
+under H0: rho = 0, LM_lag ~ chi^2(1).
 
 **Robust versions** (Anselin et al. 1996): rLM_error and rLM_lag correct each statistic for the presence of the other spatial misspecification.
 
-**Panel implementation:** The block-diagonal panel weight matrix `W_NT = I_T ⊗ W` (Kronecker product) is passed to `spreg.panel_LMerror` and `spreg.panel_LMlag`. Implemented in `scipy.sparse.kron(I_T, W)`.
-
-**Decision tree** (Anselin 1988, p. 103):
-1. If LM_error sig, LM_lag not → SEM preferred
-2. If LM_lag sig, LM_error not → SAR preferred
-3. If both sig → use rLM_error vs rLM_lag; larger robust statistic indicates preferred model
-4. If neither sig → no spatial dependence
+**Panel implementation:** Block-diagonal panel weight matrix `W_NT = I_T kron W` passed to `spreg.panel_LMerror` and `spreg.panel_LMlag`.
 
 **Results:**
 
@@ -479,7 +423,7 @@ def sec_conley():
     df = load(OUT / "conley_se_comparison.csv")
     if df is None:
         return ""
-    s = section("7. Conley SE Comparison")
+    s = section("6. Conley SE Comparison")
 
     s += """
 **Source:** `analysis/inference/conley_se.py`
@@ -488,79 +432,75 @@ def sec_conley():
 
 ---
 
-**Model** (same point estimate β across all four estimators):
+**Model** (same point estimate beta across all four estimators):
 
 ```
-Δln(loans)̃_it = β · L̃inter_bra_it + ũ_it     (two-way FE OLS)
+delta_ln(loans)_tilde_it = beta * L_tilde_inter_bra_it + u_tilde_it     (two-way FE OLS)
 ```
 
 **General sandwich variance** (White 1980):
 
 ```
-Var(β̂) = (X'X)⁻¹ · B̂ · (X'X)⁻¹ · df_correction    ...(13)
+Var(beta_hat) = (X'X)^{-1} * B_hat * (X'X)^{-1} * df_correction    ...(13)
 ```
-
-For the scalar k=1 case: `Var(β̂) = B̂ / (X'X)² · df_correction`
 
 ---
 
-**Estimator 1 — State-clustered (Favara & Imbs 2015 baseline):**
+**Estimator 1 -- State-clustered (Favara & Imbs 2015 baseline):**
 
 ```
-B_state = Σ_s score_s²
-score_s = Σ_{c∈s} Σ_t ũ_ct · x̃_ct              ...(14)
+B_state = sum_s score_s^2
+score_s = sum_{c in s} sum_t u_tilde_ct * x_tilde_ct              ...(14)
 df_corr = G / (G - 1)   (G = number of states)
 ```
 
 ---
 
-**Estimator 2 & 3 — Spatial HAC** (Conley 1999):
+**Estimator 2 & 3 -- Spatial HAC** (Conley 1999):
 
 ```
-B_spatial = Σ_t  v_t' W v_t
-where v_t[c] = ũ_ct · x̃_ct   (element-wise product)     ...(15)
+B_spatial = sum_t  v_t' W v_t
+where v_t[c] = u_tilde_ct * x_tilde_ct   (element-wise product)     ...(15)
 ```
-
-Equivalently: `B_spatial = Σ_t Σ_c Σ_{c'} w_{cc'} ũ_ct ũ_{c't} x̃_ct x̃_{c't}`
-
-`df_corr = NT / (NT - k - 1)` where k = number of non-FE regressors
 
 Applied with W = W_geo (estimator 2) and W = W_bank (estimator 3).
 
 ---
 
-**Estimator 4 — Two-way (State + Spatial)** (Colella et al. 2019):
+**Estimator 4 -- Two-way (State + Spatial)** (Colella et al. 2019):
 
 ```
-B_twoway = B_state + B_spatial(W_bank) - B_OLS     ...(16)
-B_OLS    = Σ_{c,t} ũ²_ct · x̃²_ct               (HC1 overlap term)
+B_twoway = B_state + B_spatial(W_bank) - B_overlap     ...(16)
 ```
 
-Interpretation: `B_twoway` avoids double-counting the diagonal contribution that appears in both `B_state` and `B_spatial`.
+where `B_overlap` = sum over within-state AND spatially-linked county pairs:
+
+```
+B_overlap = sum_t sum_{c,c'} w_{cc'} * 1{state(c)==state(c')} * u_ct u_{c't} x_ct x_{c't}     ...(16b)
+```
+
+This is the true double-counted region (pairs that appear in both B_state and B_spatial).
+The old formula used B_OLS (diagonal sum) as the overlap term, which is incorrect because W has zero diagonal.
+The `se_twoway_old` column shows the old formula for comparison.
 
 ---
-
-**95% CI and t-statistic:**
-
-```
-CI = [β̂ - 1.96 · SE, β̂ + 1.96 · SE]
-t  = β̂ / SE
-p  = 2 · Φ(-|t|)     (two-sided normal)          ...(17)
-```
 
 **Results:**
 
 """
     rows = []
     for _, r in df.dropna(subset=["beta"]).iterrows():
-        rows.append({
+        row_d = {
             "Sample": r["sample"],
             "Estimator": r["estimator"],
-            "β": fmt(r["beta"]),
+            "beta": fmt(r["beta"]),
             "SE": fmt(r["se"]),
             "95% CI": f"[{fmt(r['ci_lower'])}, {fmt(r['ci_upper'])}]",
             "t-stat": f"{fmt(r['t_stat'], 2)}{stars(r['p_value'])}",
-        })
+        }
+        if "se_twoway_old" in r and pd.notna(r.get("se_twoway_old", np.nan)):
+            row_d["SE (old formula)"] = fmt(r["se_twoway_old"])
+        rows.append(row_d)
     s += md_table(pd.DataFrame(rows))
     return s
 
@@ -570,7 +510,7 @@ def sec_fgls():
     ht  = load(OUT / "fgls_hausman_moran.csv")
     if df is None:
         return ""
-    s = section("8. FGLS Comparison")
+    s = section("7. FGLS Comparison")
 
     s += """
 **Source:** `analysis/inference/fgls.py`
@@ -582,63 +522,53 @@ def sec_fgls():
 **Model:**
 
 ```
-Δln(loans)_it = β · Linter_bra_it + α_i + τ_t + ε_it
+delta_ln(loans)_it = beta * Linter_bra_it + a_i + tau_t + eps_it
 ```
 
-**Spatial filter** (Applied period-by-period):
+**Spatial filter** (applied period-by-period):
 
 ```
-A = I - λ · W                                       ...(18)
-ỹ_A[t] = A · ỹ[t],   X̃_A[t] = A · X̃[t]
+A = I - lambda * W                                       ...(18)
+y_tilde_A[t] = A * y_tilde[t],   X_tilde_A[t] = A * X_tilde[t]
 ```
 
-where `ỹ[t]` and `X̃[t]` are the two-way FE within-demeaned arrays for period t (eq. 3).
-
-**Stability condition** (required before applying filter):
-
-```
-|λ| < 1 / ρ(W)    where ρ(W) = max eigenvalue of W  ...(19)
-```
-
-(Gershgorin bound used as fallback: `ρ(W) ≤ max_i Σ_j |w_ij|`)
+where `y_tilde[t]` and `X_tilde[t]` are the two-way FE within-demeaned arrays for period t (eq. 3).
 
 **FGLS point estimate** (scalar k=1 case):
 
 ```
-β_FGLS = (X̃_A' X̃_A)⁻¹ X̃_A' ỹ_A = (X̃_A' ỹ_A) / (X̃_A' X̃_A)    ...(20)
+beta_FGLS = (X_tilde_A' X_tilde_A)^{-1} X_tilde_A' y_tilde_A     ...(20)
 ```
 
-**State-clustered SE (FGLS)** — unfiltered residuals, filtered regressor as bread:
+**State-clustered SE (FGLS)** -- unfiltered residuals, filtered regressor as bread:
 
 ```
-ξ̂_it = ỹ_it - x̃_it · β_FGLS             [unfiltered residuals]
-bread = Σ_{c,t} (X̃_A,ct)²
-score_s = Σ_{c∈s,t} X̃_A,ct · ξ̂_ct
-meat = Σ_s score_s²
-Var(β̂_FGLS) = meat / bread² · G/(G-1)        ...(21)
+xi_hat_it = y_tilde_it - x_tilde_it * beta_FGLS             [unfiltered residuals]
+bread = sum_{c,t} (X_tilde_A,ct)^2
+score_s = sum_{c in s, t} X_tilde_A,ct * xi_hat_ct
+meat = sum_s score_s^2
+Var(beta_hat_FGLS) = meat / bread^2 * G/(G-1)        ...(21)
 ```
 
 **Four estimators:**
-- **OLS:** A = I (no filter), λ = 0
-- **FGLS W_geo:** λ = λ̂_geo from Panel_FE_Error (§1)
-- **FGLS W_bank:** λ = λ̂_bank from Panel_FE_Error (§1)
-- **FGLS W\*:** Composite W* = 0.20·W_geo + 0.80·W_bank (Pair A optimal α* from §4), λ = λ̂ at α* = 0.20
+- **OLS:** A = I (no filter), lambda = 0
+- **FGLS W_geo:** lambda = lambda_hat_geo from Panel_FE_Error (section 1)
+- **FGLS W_bank:** lambda = lambda_hat_bank from Panel_FE_Error (section 1)
+- **FGLS W*:** Composite W* = 0.20*W_geo + 0.80*W_bank (Pair A optimal alpha* from section 3)
 
-**Hausman test** (H₀: OLS = FGLS W_bank, i.e., no spatial misspecification bias):
-
-```
-H = (β_OLS - β_FGLS)² / (SE_OLS² - SE_FGLS²) ~ χ²(1)    ...(22)
-```
-
-Fallback when denominator ≤ 0 (non-positive definite variance difference):
+**Hausman test** (H0: OLS = FGLS W_bank, i.e., no spatial misspecification bias):
 
 ```
-t_diff = (β_OLS - β_FGLS) / sqrt(SE_OLS² + SE_FGLS²)     ...(23)
+H = (beta_OLS - beta_FGLS)^2 / (SE_OLS^2 - SE_FGLS^2) ~ chi^2(1)    ...(22)
 ```
 
-**Residual Moran's I** on FGLS W_bank filtered residuals (year-by-year), using permutation test (eq. 25 below).
+Fallback when denominator <= 0 (non-positive definite variance difference):
 
-**FGLS β estimates:**
+```
+t_diff = (beta_OLS - beta_FGLS) / sqrt(SE_OLS^2 + SE_FGLS^2)     ...(23)
+```
+
+**FGLS beta estimates:**
 
 """
     rows = []
@@ -646,9 +576,9 @@ t_diff = (β_OLS - β_FGLS) / sqrt(SE_OLS² + SE_FGLS²)     ...(23)
         rows.append({
             "Sample": r["sample"],
             "Estimator": r["estimator"],
-            "β": f"{fmt(r['beta'])} ({fmt(r['se'])}){stars(r['p_value'])}",
+            "beta": f"{fmt(r['beta'])} ({fmt(r['se'])}){stars(r['p_value'])}",
             "95% CI": f"[{fmt(r['ci_lower'])}, {fmt(r['ci_upper'])}]",
-            "N counties": fmti(r["N"]),
+            "N counties": safe_int(r["N"]),
         })
     s += md_table(pd.DataFrame(rows))
 
@@ -671,7 +601,7 @@ def sec_sar_robustness():
     df = load(OUT / "sar_robustness_credit.csv")
     if df is None:
         return ""
-    s = section("9. SAR Robustness Check")
+    s = section("8. SAR Robustness Check")
 
     s += """
 **Source:** `analysis/sar/sar_credit.py`
@@ -683,18 +613,16 @@ def sec_sar_robustness():
 **SAR (Spatial Lag) model:**
 
 ```
-Δln(loans)_it = ρ · (W Δln(loans))_it + β · Linter_bra_it + α_i + τ_t + u_it    ...(24)
+delta_ln(loans)_it = rho * (W delta_ln(loans))_it + beta * Linter_bra_it + a_i + tau_t + u_it    ...(24)
 ```
-
-where the spatial lag `(WΔln(loans))_it` is the **outcome variable** spatially lagged, as opposed to the SEM's error lag.
 
 Estimated via `spreg.Panel_FE_Lag`, which instruments `Wy` internally using spatial lags of the exogenous regressors (Kelejian & Prucha 1998).
 
-**Rho gap test** (same structure as eq. 4):
+**Rho gap test:**
 
 ```
-Δρ = ρ̂_bank - ρ̂_geo
-z = Δρ / sqrt(SE(ρ̂_bank)² + SE(ρ̂_geo)²)
+delta_rho = rho_hat_bank - rho_hat_geo
+z = delta_rho / sqrt(SE(rho_hat_bank)^2 + SE(rho_hat_geo)^2)
 ```
 
 **Results:**
@@ -703,82 +631,17 @@ z = Δρ / sqrt(SE(ρ̂_bank)² + SE(ρ̂_geo)²)
     rows = []
     for _, r in df.iterrows():
         gap_str = f"{fmt(r['delta_rho'])} (z={fmt(r['z_stat'], 2)}){stars(0.001)}" \
-            if pd.notna(r.get("delta_rho", np.nan)) and not pd.isna(r.get("delta_rho")) else "—"
+            if pd.notna(r.get("delta_rho", np.nan)) and not pd.isna(r.get("delta_rho")) else "--"
         rows.append({
             "Sample": r["sample"],
             "W": r["w_matrix"],
-            "ρ (spatial lag)": f"{fmt(r['rho'])} ({fmt(r['rho_se'])}){stars(0.001)}",
-            "β (deregulation)": f"{fmt(r['beta_D'])} ({fmt(r['beta_D_se'])}){stars(0.001)}",
-            "Δρ (bank−geo)": gap_str,
-            "N obs": fmti(r["n_obs"]),
+            "rho (spatial lag)": f"{fmt(r['rho'])} ({fmt(r['rho_se'])}){stars(0.001)}",
+            "beta (deregulation)": f"{fmt(r['beta_D'])} ({fmt(r['beta_D_se'])}){stars(0.001)}",
+            "delta_rho (bank-geo)": gap_str,
+            "N obs": safe_int(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
-    s += "\n*SAR ρ is analogous to SEM λ but governs the outcome (not the error) process.*\n"
-    return s
-
-
-def sec_sar_iv():
-    df = load(OUT / "sar_iv_results.csv")
-    if df is None:
-        return ""
-    s = section("10. IV-SAR Estimation")
-
-    s += """
-**Source:** `analysis/sar/sar_iv_credit.py`
-
-**References:** Kelejian & Prucha (1998) *A Generalised Spatial Two-Stage Least Squares Procedure*; Moran (1950)
-
----
-
-**Model** (same as SAR, eq. 24):
-
-```
-y_it = ρ · (W y)_it + β · Linter_bra_it + α_i + τ_t + ξ_it
-```
-
-The spatial lag `(Wy)` is **endogenous** — correlated with ξ through the feedback loop.
-
-**Instruments** (Kelejian & Prucha 1998):
-
-```
-q1_it = (W · Linter_bra)_it      (first spatial lag of deregulation)
-q2_it = (W² · Linter_bra)_it     (second spatial lag of deregulation)
-```
-
-**2SLS estimation steps** (all on within-demeaned data, eq. 3):
-
-```
-Step 1: two-way within-transform all variables → ỹ, ẑ = Wỹ, x̃, q̃1, q̃2
-Step 2: First stage OLS (instrument relevance):
-         ẑ ~ [x̃, q̃1, q̃2]  →  ẑ_hat
-         F-stat tests H₀: α_WD = α_W2D = 0    ...(25)
-Step 3: Second stage OLS:
-         ỹ ~ [ẑ_hat, x̃]  →  (ρ̂_IV, β̂_IV)    ...(26)
-Step 4: 2SLS SEs using ORIGINAL spatial lag (not ẑ_hat) for residuals:
-         ξ̂ = ỹ - ẑ · (ρ̂, β̂)'   [uses Z_orig, not Z_hat]
-Step 5: State-clustered sandwich (eq. 14) applied to Z_hat as bread:
-         score_s = Σ_{obs∈s} Z_hat_obs' · ξ̂_obs
-         B = Σ_s score_s · score_s'
-         V = (Z_hat' Z_hat)⁻¹ · B · (Z_hat' Z_hat)⁻¹ · G/(G-1)    ...(27)
-Step 6: Moran's I on SAR residuals (year-by-year, eq. 28 below)
-```
-
-**Results:**
-
-"""
-    rows = []
-    for _, r in df.dropna(subset=["rho"]).iterrows():
-        rows.append({
-            "Sample": r["sample"],
-            "W": r["W"],
-            "ρ (IV)": f"{fmt(r['rho'])} ({fmt(r['rho_se'])})",
-            "β": f"{fmt(r['beta'])} ({fmt(r['beta_se'])})",
-            "1st stage F": fmt(r["first_stage_F"], 1),
-            "Moran I (resid, mean)": fmt(r["residual_moran_i_mean"]),
-            "N obs": fmti(r["N_obs"]),
-        })
-    s += md_table(pd.DataFrame(rows))
-    s += "\n*IV-SAR can be unstable when first-stage F < 10. Non-border sample instruments are weak.*\n"
+    s += "\n*SAR rho is analogous to SEM lambda but governs the outcome (not the error) process.*\n"
     return s
 
 
@@ -786,7 +649,7 @@ def sec_bank_interstate():
     df = load(OUT / "bank_interstate_credit_results.csv")
     if df is None:
         return ""
-    s = section("11. Endogeneity Check — Interstate Bank Links Only")
+    s = section("9. Endogeneity Check -- Interstate Bank Links Only")
 
     s += """
 **Source:** `analysis/sem/sem_link_restrictions.py`
@@ -795,20 +658,18 @@ def sec_bank_interstate():
 
 ---
 
-**Model:** Same as §1, equations (1)–(2), using `W_bank_interstate`.
+**Model:** Same as section 1, equations (1)-(2), using `W_bank_interstate`.
 
 **Matrix construction:**
 
 ```
-W_bank_interstate[i,j] = W_bank[i,j]  if state(i) ≠ state(j)
+W_bank_interstate[i,j] = W_bank[i,j]  if state(i) != state(j)
                         = 0            if state(i) = state(j)     ...(28)
 ```
 
 followed by row-standardisation.
 
 **Motivation:** Within-state bank links may reflect economic sorting (endogeneity). Cross-state links isolate post-IBBEA deregulation and are less subject to within-state omitted-variable bias.
-
-**Identification prediction:** If λ_interstate ≈ 0 in the border-MSA sample, the estimated bank-network channel is spurious (driven by geographic proximity or within-state sorting rather than cross-state deregulation).
 
 **Results:**
 
@@ -817,9 +678,9 @@ followed by row-standardisation.
     for _, r in df.dropna(subset=["lam"]).iterrows():
         rows.append({
             "Model": r["model"],
-            "β": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
-            "λ": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
-            "N obs": fmti(r["n_obs"]),
+            "beta": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
+            "lambda": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
+            "N obs": safe_int(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     return s
@@ -829,7 +690,7 @@ def sec_bank_intrastate():
     df = load(OUT / "bank_intrastate_credit_results.csv")
     if df is None:
         return ""
-    s = section("12. Placebo Check — Intrastate Bank Links Only")
+    s = section("10. Placebo Check -- Intrastate Bank Links Only")
 
     s += """
 **Source:** `analysis/sem/sem_link_restrictions.py`
@@ -838,18 +699,18 @@ def sec_bank_intrastate():
 
 ---
 
-**Model:** Same as §1, equations (1)–(2), using `W_bank_intrastate`.
+**Model:** Same as section 1, equations (1)-(2), using `W_bank_intrastate`.
 
 **Matrix construction** (complement of eq. 28):
 
 ```
 W_bank_intrastate[i,j] = W_bank[i,j]  if state(i) = state(j)
-                        = 0            if state(i) ≠ state(j)     ...(29)
+                        = 0            if state(i) != state(j)     ...(29)
 ```
 
 followed by row-standardisation.
 
-**Placebo logic:** If the bank-network channel captures genuine cross-state deregulation spillovers, then `W_bank_intrastate` (which only preserves within-state links) should yield λ_intrastate < λ_bank. A large λ_intrastate would suggest the bank channel proxies intra-state economic correlation rather than the IBBEA deregulation shock.
+**Placebo logic:** If the bank-network channel captures genuine cross-state deregulation spillovers, then `W_bank_intrastate` should yield lambda_intrastate < lambda_bank. A large lambda_intrastate would suggest the bank channel proxies intra-state economic correlation rather than the IBBEA deregulation shock.
 
 **Results:**
 
@@ -858,9 +719,9 @@ followed by row-standardisation.
     for _, r in df.dropna(subset=["lam"]).iterrows():
         rows.append({
             "Model": r["model"],
-            "β": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
-            "λ": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
-            "N obs": fmti(r["n_obs"]),
+            "beta": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
+            "lambda": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
+            "N obs": safe_int(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     return s
@@ -870,7 +731,7 @@ def sec_bank_nongeo():
     df = load(OUT / "bank_nongeo_credit_results.csv")
     if df is None:
         return ""
-    s = section("13. Non-Geographic Bank Network")
+    s = section("11. Non-Geographic Bank Network")
 
     s += """
 **Source:** `analysis/sem/sem_link_restrictions.py`
@@ -879,7 +740,7 @@ def sec_bank_nongeo():
 
 ---
 
-**Model:** Same as §1, equations (1)–(2), using `W_bank_nonGeo`.
+**Model:** Same as section 1, equations (1)-(2), using `W_bank_nonGeo`.
 
 **Matrix construction:**
 
@@ -888,9 +749,9 @@ W_bank_nonGeo[i,j] = W_bank[i,j]  if W_geo[i,j] = 0
                    = 0             if W_geo[i,j] > 0          ...(30)
 ```
 
-followed by row-standardisation. This removes all bank-network links that coincide with geographic adjacency, isolating the purely non-geographic component.
+followed by row-standardisation. Removes all bank-network links that coincide with geographic adjacency.
 
-**Purpose:** Tests whether the bank-network spatial channel is genuinely distinct from geographic proximity. If λ_nonGeo is large and significant, bank spillovers operate independently of geographic contiguity.
+**Purpose:** Tests whether the bank-network spatial channel is genuinely distinct from geographic proximity.
 
 **Results:**
 
@@ -899,9 +760,9 @@ followed by row-standardisation. This removes all bank-network links that coinci
     for _, r in df.dropna(subset=["lam"]).iterrows():
         rows.append({
             "Model": r["model"],
-            "β": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
-            "λ": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
-            "N obs": fmti(r["n_obs"]),
+            "beta": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
+            "lambda": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
+            "N obs": safe_int(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     return s
@@ -911,14 +772,20 @@ def sec_knn():
     df = load(OUT / "knn_sweep_credit_results.csv")
     if df is None:
         return ""
-    # Detect column naming convention (nb vs border)
-    has_nb     = "lam_geo_nb"     in df.columns
-    has_border = "lam_geo_border" in df.columns
-    lam_nb_col = "lam_geo_nb"     if has_nb else "lam_geo_border"
-    knn_nb_col = "lam_bank_knn_nb" if "lam_bank_knn_nb" in df.columns else "lam_bank_knn_border"
-    gap_nb_col = "gap_nb"         if "gap_nb" in df.columns else "gap_border"
 
-    s = section("14. KNN Crossover Sweep")
+    # Detect column naming convention -- prefer new names, fall back to old
+    def _col(new, *fallbacks):
+        if new in df.columns:
+            return new
+        for fb in fallbacks:
+            if fb in df.columns:
+                return fb
+        return new  # will show missing gracefully
+
+    knn_co_col  = _col("lam_bank_knn_contig",  "lam_bank_knn_border", "lam_bank_knn_nb")
+    gap_co_col  = _col("gap_contig",            "gap_border",          "gap_nb")
+
+    s = section("12. KNN Crossover Sweep")
 
     s += """
 **Source:** `analysis/sem/sem_knn_sweep.py`
@@ -927,7 +794,7 @@ def sec_knn():
 
 ---
 
-**Model:** Same as §1, equations (1)–(2), replacing W_bank with `W_bank_knn_k`.
+**Model:** Same as section 1, equations (1)-(2), replacing W_bank with `W_bank_knn_k`.
 
 **KNN matrix construction:**
 
@@ -938,32 +805,31 @@ W_bank_knn_k[i, :] retains only the top-k entries of W_bank[i, :]
 
 followed by row-standardisation. k sweeps from 1 to 20.
 
-**Purpose:** Finds the crossover k where `λ_knn(k) > λ_geo`, establishing the bank-network density at which spatial error dependence matches geographic contiguity. W_geo has density ≈ 0.33% (mean ~3.4 neighbours per county).
+**Purpose:** Finds the crossover k where lambda_knn(k) > lambda_geo, establishing the bank-network density at which spatial error dependence matches geographic contiguity.
 
-**Density** = non-zero off-diagonal links / (N · (N-1))
-
-**Reference lambdas:** λ_geo (full) = 0.1801, λ_geo (border) = 0.1701 (from §1).
+**Density** = non-zero off-diagonal links / (N * (N-1))
 
 **Results (selected k values):**
 
 """
-    show_ks = [1, 2, 3, 5, 8, 10, 15, 20]
+    show_ks = [1, 2, 4, 8, 10, 15, 20]
     sub = df[df["k"].isin(show_ks)].copy()
     rows = []
     for _, r in sub.iterrows():
         rows.append({
-            "k": fmti(r["k"]),
+            "k": safe_int(r["k"]),
             "Density (%)": fmt(r["density"] * 100, 3),
-            "λ_knn (full)": fmt(r["lam_bank_knn"]),
+            "lambda_knn (full)": fmt(r["lam_bank_knn"]),
             "gap (full)": fmt(r["gap"]),
-            "λ_knn (border)": fmt(r[knn_nb_col]),
-            "gap (border)": fmt(r[gap_nb_col]),
+            "lambda_knn (contig)": fmt(r.get(knn_co_col, np.nan)),
+            "gap (contig)": fmt(r.get(gap_co_col, np.nan)),
         })
     s += md_table(pd.DataFrame(rows))
 
     cf = df[df["gap"] > 0]["k"].min() if (df["gap"] > 0).any() else ">20"
-    cb = df[df[gap_nb_col] > 0]["k"].min() if (df[gap_nb_col] > 0).any() else ">20"
-    s += f"\n**Crossover k:** Full sample = **k={cf}**; Border sample = **k={cb}**\n"
+    cb_vals = df[df.get(gap_co_col, pd.Series(dtype=float)) > 0]["k"] if gap_co_col in df.columns else pd.Series(dtype=float)
+    cb = cb_vals.min() if len(cb_vals) > 0 else ">20"
+    s += f"\n**Crossover k:** Full sample = **k={cf}**; Contig sample = **k={cb}**\n"
     return s
 
 
@@ -971,7 +837,7 @@ def sec_spatial_multiplier():
     df = load(OUT / "spatial_multiplier_decomposition.csv")
     if df is None:
         return ""
-    s = section("15. SEM Spatial Multiplier Decomposition")
+    s = section("13. SEM Spatial Multiplier Decomposition")
 
     s += """
 **Source:** `analysis/sar/multiplier_decomposition.py`
@@ -983,31 +849,27 @@ def sec_spatial_multiplier():
 **Framework:** Under the SEM (eq. 2), the reduced-form error covariance satisfies:
 
 ```
-u = (I - λW)⁻¹ ε  ≡  S · ε
+u = (I - lambda W)^{-1} eps  =  S * eps
 ```
 
-The **impact matrix** `S = (I - λW)⁻¹` captures total statistical co-movement (not structural causal transmission) in the disturbance process between county pairs.
+The **impact matrix** `S = (I - lambda W)^{-1}` captures total statistical co-movement in the disturbance process between county pairs.
 
-**Power-series expansion** (converges when |λ| < 1/ρ(W)):
+**Power-series expansion** (converges when |lambda| < 1/rho(W)):
 
 ```
-S = I + λW + λ²W² + λ³W³ + ...     ...(32)
+S = I + lambda W + lambda^2 W^2 + lambda^3 W^3 + ...     ...(32)
 ```
-
-Decomposition:
-- k=0 term (I): **direct / own-county retention**
-- k≥1 terms (λᵏWᵏ): **k-th order network transmission**
 
 **Scalar summaries:**
 ```
-Total multiplier  = Σ_k λᵏ tr(Wᵏ)/N  ≈ 1/(1-λ) for symmetric W
+Total multiplier  = sum_k lambda^k tr(W^k)/N  = 1/(1-lambda) for symmetric W
 Avg indirect effect = (Total multiplier) - (Avg direct)
-Indirect share (%) = 100 · Avg indirect / Total multiplier     ...(33)
+Indirect share (%) = 100 * Avg indirect / Total multiplier     ...(33)
 ```
 
-**Average reach (km):** Weighted average distance between counties, with weights proportional to the k-th order impact share. Requires county centroid coordinates.
+**Average reach (km):** Weighted average distance between counties, with weights proportional to the k-th order impact share. Uses sample-specific county subsets with W subsetted to sample counties before dropping islands.
 
-Series terminates when `||λᵏWᵏ||_∞ < 10⁻⁴` (convergence threshold) or k > 600.
+Series terminates when ||lambda^k W^k||_inf < 10^{-4} (convergence threshold) or k > 600.
 
 **Results:**
 
@@ -1017,7 +879,7 @@ Series terminates when `||λᵏWᵏ||_∞ < 10⁻⁴` (convergence threshold) or
         rows.append({
             "Outcome": r["outcome"],
             "W": r["w_matrix"],
-            "λ": fmt(r["lambda"]),
+            "lambda": fmt(r["lambda"]),
             "Total multiplier": fmt(r["total_multiplier"], 3),
             "Avg direct": fmt(r["avg_direct"], 3),
             "Avg indirect": fmt(r["avg_indirect"], 3),
@@ -1032,7 +894,7 @@ def sec_sar_multiplier():
     df = load(OUT / "multiplier_counterfactual.csv")
     if df is None:
         return ""
-    s = section("16. SAR Multiplier Counterfactual")
+    s = section("14. SAR Multiplier Counterfactual")
 
     s += """
 **Source:** `analysis/extensions/multiplier_counterfactual.py`
@@ -1041,27 +903,27 @@ def sec_sar_multiplier():
 
 ---
 
-**Framework:** For the SAR model (eq. 24) with row-stochastic W (W·1 = 1), the scalar total multiplier is:
+**Framework:** For the SAR model (eq. 24) with row-stochastic W (W*1 = 1), the scalar total multiplier is:
 
 ```
-M = 1 / (1 - ρ)     ...(34)
+M = 1 / (1 - rho)     ...(34)
 ```
 
-**Effect decomposition** for a unit deregulation shock (ΔD = 1):
+**Effect decomposition** for a unit deregulation shock (delta_D = 1):
 
 ```
-Direct effect   = β_D                       (own-county, no network)
-Total effect    = β_D / (1 - ρ) = β_D · M   (own-county + network)
-Indirect effect = Total - Direct = β_D · ρ / (1 - ρ)    ...(35)
+Direct effect   = beta_D                       (own-county, no network)
+Total effect    = beta_D / (1 - rho) = beta_D * M   (own-county + network)
+Indirect effect = Total - Direct = beta_D * rho / (1 - rho)    ...(35)
 ```
 
 **Parametric bootstrap CI** (1000 draws, seed = 0):
 
 ```
-(ρ*, β*) ~ N([ρ̂, β̂], diag([SE_ρ², SE_β²]))    ...(36)
+(rho*, beta*) ~ N([rho_hat, beta_hat], diag([SE_rho^2, SE_beta^2]))    ...(36)
 ```
 
-Draws with |ρ*| ≥ 1 are discarded (SAR stability condition requires |ρ| < 1/ρ(W) ≤ 1). CIs = [5th, 95th] percentile of accepted draws.
+Draws with |rho*| >= 1 are discarded (SAR stability condition). CIs = [5th, 95th] percentile of accepted draws.
 
 **Results (selected W matrices):**
 
@@ -1075,9 +937,9 @@ Draws with |ρ*| ≥ 1 are discarded (SAR stability condition requires |ρ| < 1/
         rows.append({
             "Sample": r["sample"],
             "W": r["w_matrix"],
-            "ρ": fmt(r["rho"]),
-            "M = 1/(1-ρ)": fmt(r["multiplier"], 3),
-            "Direct (β)": fmt(r["point_direct"]),
+            "rho": fmt(r["rho"]),
+            "M = 1/(1-rho)": fmt(r["multiplier"], 3),
+            "Direct (beta)": fmt(r["point_direct"]),
             "Indirect": fmt(r["point_indirect"]),
             "Total": fmt(r["point_total"]),
             "Total 90% CI": f"[{fmt(r['p5_tot'])}, {fmt(r['p95_tot'])}]",
@@ -1091,7 +953,7 @@ def sec_slx():
     df = load(OUT / "slx_exposure_results.csv")
     if df is None:
         return ""
-    s = section("17. SLX Exposure — Bank-Network Deregulation Spillover")
+    s = section("15. SLX Exposure -- Bank-Network Deregulation Spillover")
     s += """
 **Source:** `analysis/extensions/slx_exposure.py`
 
@@ -1105,8 +967,7 @@ def sec_slx():
 E_{c,t} = sum_{c'} w^{interstate}_{cc'} * D_{s(c'),t}     ...(37)
 ```
 
-where `D = Linter_bra` (state-level deregulation index) and `w^{interstate}` is the row-standardised
-interstate bank-network weight matrix (cross-state links only, eq. 28).
+where `D = Linter_bra` (state-level deregulation index) and `w^{interstate}` is the row-standardised interstate bank-network weight matrix (cross-state links only, eq. 28).
 
 **Regression specifications** (two-way county + year FE, within estimator):
 
@@ -1130,8 +991,8 @@ p_perm = #{|beta^pi_E| >= |beta_E_obs|} / 999     ...(39)
     rows = []
     for _, r in df.iterrows():
         beta_e_str = (f"{fmt(r['beta_E'])} ({fmt(r['se_E'])}){stars(r.get('p_E', 1.0))}"
-                      if pd.notna(r.get("beta_E", np.nan)) else "—")
-        perm_str = fmt(r["p_perm"]) if pd.notna(r.get("p_perm", np.nan)) else "—"
+                      if pd.notna(r.get("beta_E", np.nan)) else "--")
+        perm_str = fmt(r["p_perm"]) if pd.notna(r.get("p_perm", np.nan)) else "--"
         rows.append({
             "Sample": r["sample"],
             "Spec": r["spec"],
@@ -1139,7 +1000,7 @@ p_perm = #{|beta^pi_E| >= |beta_E_obs|} / 999     ...(39)
             "beta_D (SE)": f"{fmt(r['beta_D'])} ({fmt(r['se_D'])}){stars(r['p_D'])}",
             "beta_E (SE)": beta_e_str,
             "p_perm": perm_str,
-            "N obs": fmti(r["n_obs"]),
+            "N obs": safe_int(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     s += "\n*Standard errors in parentheses. p_perm: permutation-based p-value for beta_E.*\n"
@@ -1150,19 +1011,13 @@ def sec_moran_diagnostics():
     df = load(DIAG / "moran_i_results.csv")
     if df is None:
         return ""
-    s = section("18. Moran's I — Pre-Estimation Diagnostics")
+    s = section("16. Moran's I -- Pre-Estimation Diagnostics")
     s += """
 **Source:** `analysis/diagnostics/moran_baseline.py`
 
 **References:** Moran (1950) *Notes on Continuous Stochastic Phenomena*; Cliff & Ord (1981) *Spatial Processes*
 
 ---
-
-**Baseline OLS** (two-way FE, replicates Favara & Imbs 2015):
-
-```
-delta_ln(loans)_it = beta * Linter_bra_it + controls + a_i + tau_t + u_it   ...(40)
-```
 
 **Moran's I statistic** (Moran 1950):
 
@@ -1196,14 +1051,14 @@ p_perm = #{|I^pi| >= |I_obs|} / 999              ...(43)
                .reset_index())
     rows = [{"Outcome": r["outcome"],
              "Mean Moran's I": fmt(r["mean_I"]),
-             "Significant years / total": f"{fmti(r['sig_years'])}/{fmti(r['total_years'])}"}
+             "Significant years / total": f"{safe_int(r['sig_years'])}/{safe_int(r['total_years'])}"}
             for _, r in summary.iterrows()]
     s += md_table(pd.DataFrame(rows))
 
     s += "\n**Year-by-year (county level):**\n\n"
     sub = df[df["level"] == "county"][
         ["year", "outcome", "moran_I", "z_score", "p_value", "significant"]].copy()
-    rows2 = [{"Year": fmti(r["year"]), "Outcome": r["outcome"],
+    rows2 = [{"Year": safe_int(r["year"]), "Outcome": r["outcome"],
                "Moran's I": fmt(r["moran_I"]), "z": fmt(r["z_score"], 2),
                "p": pval_str(r["p_value"]), "Sig": "Y" if r["significant"] else ""}
              for _, r in sub.iterrows()]
@@ -1215,7 +1070,7 @@ def sec_moran_composite():
     df = load(DIAG / "moran_i_composite_credit_summary.csv")
     if df is None:
         return ""
-    s = section("19. Moran's I Under Composite W — Credit Residuals")
+    s = section("17. Moran's I Under Composite W -- Credit Residuals")
     s += """
 **Source:** `analysis/diagnostics/moran_bank_variants.py`
 
@@ -1223,7 +1078,7 @@ def sec_moran_composite():
 
 ---
 
-Moran's I (eq. 41) on credit SEM residuals under composite W matrices from section 4.
+Moran's I (eq. 41) on credit SEM residuals under composite W matrices from section 3.
 A lower Moran's I at alpha* validates the composite weighting approach.
 
 **Summary:**
@@ -1236,7 +1091,7 @@ A lower Moran's I at alpha* validates the composite weighting approach.
             "W matrix": r["w_matrix"],
             "alpha": fmt(r["alpha"]),
             "Mean Moran's I": fmt(r["mean_moran_I"]),
-            "Sig. years": f"{fmti(r['significant_years'])}/{fmti(r['n_years'])}",
+            "Sig. years": f"{safe_int(r['significant_years'])}/{safe_int(r['n_years'])}",
         })
     s += md_table(pd.DataFrame(rows))
     return s
@@ -1246,7 +1101,7 @@ def sec_moran_wbank():
     df = load(DIAG / "moran_i_wbank_summary.csv")
     if df is None:
         return ""
-    s = section("20. Moran's I — Bank Network W Variants")
+    s = section("18. Moran's I -- Bank Network W Variants")
     s += """
 **Source:** `analysis/diagnostics/moran_bank_variants.py`
 
@@ -1256,6 +1111,7 @@ def sec_moran_wbank():
 
 Moran's I (eq. 41) on SEM residuals for all W_bank specifications and KNN truncations k=1...20.
 Lower Moran's I = better residual whitening.
+Credit outcome only.
 
 **Summary (non-KNN matrices):**
 
@@ -1264,10 +1120,32 @@ Lower Moran's I = better residual whitening.
     rows = [{"Outcome": r["outcome"], "W matrix": r["w_matrix"],
               "Mean Moran's I": fmt(r["mean_moran_I"]),
               "Median Moran's I": fmt(r["median_moran_I"]),
-              "Sig. years": f"{fmti(r['significant_years'])}/{fmti(r['n_years'])}",
+              "Sig. years": f"{safe_int(r['significant_years'])}/{safe_int(r['n_years'])}",
               "Density": fmt(r["density"] * 100, 3) + "%"}
              for _, r in non_knn.iterrows()]
     s += md_table(pd.DataFrame(rows))
+
+    # KNN rows for k = 1, 2, 4, 8, 15, 20
+    KNN_SHOW = [1, 2, 4, 8, 15, 20]
+    knn_df = df[df["w_matrix"].str.contains("knn", na=False)].copy()
+    # Extract k value
+    if not knn_df.empty:
+        knn_df = knn_df.copy()
+        knn_df["_k"] = knn_df["w_matrix"].str.extract(r"knn(\d+)").astype(float)
+        knn_df = knn_df[knn_df["_k"].isin(KNN_SHOW)].sort_values("_k")
+        if not knn_df.empty:
+            s += "\n**KNN matrices (k = 1, 2, 4, 8, 15, 20):**\n\n"
+            knn_rows = []
+            for _, r in knn_df.iterrows():
+                knn_rows.append({
+                    "W matrix": r["w_matrix"],
+                    "k": safe_int(r["_k"]),
+                    "Mean Moran's I": fmt(r["mean_moran_I"]),
+                    "Median Moran's I": fmt(r["median_moran_I"]),
+                    "Sig. years": f"{safe_int(r['significant_years'])}/{safe_int(r['n_years'])}",
+                    "Density": fmt(r["density"] * 100, 3) + "%",
+                })
+            s += md_table(pd.DataFrame(knn_rows))
     return s
 
 
@@ -1276,7 +1154,7 @@ def sec_bank_overlap():
     dist  = load(OUT / "geo_bank_overlap_distribution.csv")
     if stats is None:
         return ""
-    s = section("21. Bank-Geography Network Overlap")
+    s = section("19. Bank-Geography Network Overlap")
     s += """
 **Source:** `analysis/diagnostics/network_overlap.py`
 
@@ -1310,65 +1188,126 @@ Motivates the W_bank_nonGeo construction (eq. 30).
     return s
 
 
-def sec_lambda_time():
-    df = load(OUT / "lambda_time_yearspecific_credit_results.csv")
-    tr = load(OUT / "lambda_time_yearspecific_credit_trends.csv")
+def sec_w_density():
+    df = load(OUT / "w_density_summary.csv")
     if df is None:
         return ""
-    s = section("22. Time-Varying Lambda — Year-Specific W_bank")
+    s = section("20. W Matrix Density Summary")
     s += """
-**Source:** `analysis/deprecated/lambda_time_yearspecific_credit.py`
+**Source:** `analysis/diagnostics/w_density_summary.py`
 
-**References:** IBBEA (1994); Rice & Strahan (2010); Favara & Imbs (2015)
+**References:** Anselin (1988); LeSage & Pace (2009)
 
 ---
 
-**Model:** Year-specific cross-sectional ML_Error estimated independently for each year t:
+Density statistics for every W matrix used in the analysis pipeline.
 
-```
-delta_ln(loans)_{i,t} = beta_t * Linter_bra_{i,t} + u_{i,t}
-u_{i,t} = lambda_t * (W_t u_t) + eps_{i,t}     ...(45)
-```
+- **N**: number of counties (rows)
+- **nnz**: non-zero off-diagonal entries
+- **density_pct**: 100 * nnz / (N*(N-1))
+- **mean_nbrs / median_nbrs**: average / median off-diagonal connections per county
+- **pct_isolated**: % of rows with zero off-diagonal weight
 
-W_t = year-specific W_bank matrix.
-
-**Trend regression:**
-
-```
-lambda_t = a + b * t + eta_t     ...(46)
-```
-
-**Gap (bank minus geo):**
-
-```
-gap_t = lambda_bank,t - lambda_geo,t     ...(47)
-```
-
-**Results (lambda by year):**
+**Results:**
 
 """
     rows = []
     for _, r in df.iterrows():
         rows.append({
-            "Year": fmti(r["year"]),
-            "lambda_geo (SE)": f"{fmt(r['lam_geo'])} ({fmt(r['se_lam_geo'])})",
-            "lambda_bank (SE)": f"{fmt(r['lam_bank'])} ({fmt(r['se_lam_bank'])})",
-            "Gap": fmt(r["gap"]),
-            "N geo": fmti(r["n_geo"]),
-            "N bank": fmti(r["n_bank"]),
+            "Matrix": r["matrix"],
+            "N": safe_int(r["N"]),
+            "nnz": safe_int(r["nnz"]),
+            "density %": fmt(r["density_pct"], 4),
+            "mean nbrs": fmt(r["mean_nbrs"], 2),
+            "median nbrs": fmt(r["median_nbrs"], 2),
+            "% isolated": fmt(r["pct_isolated"], 1),
         })
     s += md_table(pd.DataFrame(rows))
-
-    if tr is not None:
-        s += "\n**Trend regression slopes (eq. 46):**\n\n"
-        trows = [{"Series": r["series"],
-                  "Slope b": fmt(r["slope"]),
-                  "Intercept a": fmt(r["intercept"]),
-                  "R2": fmt(r["r2"], 3),
-                  "p(H0: b=0)": pval_str(r["p_value"])}
-                 for _, r in tr.iterrows()]
-        s += md_table(pd.DataFrame(trows))
     return s
+
+
+def sec_hub_map():
+    """Hub county maps and centrality statistics."""
+    hub_csv = OUT / "hub_counties.csv"
+    str_csv = OUT / "bank_strength_centrality.csv"
+    map_a   = OUT / "hub_map_bank_strength.png"
+    map_b   = OUT / "hub_map_geo_transmission.png"
+
+    has_any = hub_csv.exists() or str_csv.exists()
+    if not has_any:
+        return ""
+
+    s = section("21. Hub Map -- Bank Network Centrality")
+    s += """
+**Source:** `analysis/extensions/hub_map.py`
+
+**References:** Favara & Imbs (2015); LeSage & Pace (2009); Bonacich (1987) *Power and Centrality*
+
+---
+
+**Map (a) -- Bank-network in-strength centrality:**
+
+```
+strength_i = sum_j w^{raw}_{ji}     (column sum of un-row-standardised W_bank)     ...(45)
+```
+
+Captures how many other counties' bank portfolios are most similar to county i (in-degree in the raw cosine graph).
+High-strength counties are major recipients of bank-network similarity links.
+
+**Map (b) -- SEM total transmission receiver (W_geo, Full sample):**
+
+```
+S = (I - lambda * W_geo)^{-1}
+receiver_i = sum_{j != i} S_{ij}     (off-diagonal column sum)                     ...(46)
+```
+
+Captures the total shock absorbed by county i from the spatial error network.
+lambda = lambda_hat_geo (Full sample) from section 1.
+
+"""
+    if map_a.exists():
+        s += "![Bank-network in-strength centrality](hub_map_bank_strength.png)\n\n"
+    else:
+        s += "*hub_map_bank_strength.png not yet generated.*\n\n"
+
+    if map_b.exists():
+        s += "![SEM total transmission receiver](hub_map_geo_transmission.png)\n\n"
+    else:
+        s += "*hub_map_geo_transmission.png not yet generated.*\n\n"
+
+    # Top-10 table from hub_counties.csv (sender / receiver)
+    hub = load(hub_csv)
+    if hub is not None:
+        # Filter to credit only if outcome column present
+        if "outcome" in hub.columns:
+            hub = hub[hub["outcome"] == "credit"].copy()
+        # Top-10 by total_rx if present
+        if "total_rx" in hub.columns and len(hub) > 0:
+            s += "\n**Top-10 receiver counties (total transmission received, W_geo):**\n\n"
+            top = hub.nlargest(10, "total_rx")[["fips5", "total_rx"]].copy()
+            top.columns = ["FIPS5", "Total received"]
+            s += md_table(top)
+        # Top-10 by in_strength if present
+        if "in_strength" in hub.columns and len(hub) > 0:
+            s += "\n**Top-10 in-strength counties (W_bank centrality):**\n\n"
+            top = hub.nlargest(10, "in_strength")[["fips5", "in_strength"]].copy()
+            top.columns = ["FIPS5", "In-strength"]
+            s += md_table(top)
+
+    # Fallback: use bank_strength_centrality.csv
+    str_df = load(str_csv)
+    if hub is None and str_df is not None and "in_strength" in str_df.columns:
+        s += "\n**Top-10 in-strength counties (W_bank centrality):**\n\n"
+        top = str_df.nlargest(10, "in_strength")[["fips5", "in_strength"]].copy()
+        top.columns = ["FIPS5", "In-strength"]
+        s += md_table(top)
+
+    return s
+
+
+# ── Preserved (not in active builders) ────────────────────────────────────────
+# sec_sar_iv        -- deprecated (see output/deprecated/sar_iv_results.csv)
+# sec_lambda_time   -- deprecated (year-specific lambda removed from pipeline)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1379,32 +1318,31 @@ def build_report():
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     toc = (
         "## Table of Contents\n\n"
-        "1.  [Main SEM — Credit Growth](#1-main-sem--credit-growth)\n"
-        "2.  [Main SEM — House Price Growth](#2-main-sem--house-price-growth)\n"
-        "3.  [Four-W Comparison](#3-four-w-comparison--credit-growth)\n"
-        "4.  [Composite W Profile — Credit](#4-composite-w-profile--credit-growth)\n"
-        "5.  [J-Test — Model Selection](#5-j-test--non-nested-model-selection)\n"
-        "6.  [LM Diagnostics](#6-lm-diagnostics--credit-ols-residuals)\n"
-        "7.  [Conley SE Comparison](#7-conley-se-comparison)\n"
-        "8.  [FGLS Comparison](#8-fgls-comparison)\n"
-        "9.  [SAR Robustness Check](#9-sar-robustness-check)\n"
-        "10. [IV-SAR Estimation](#10-iv-sar-estimation)\n"
-        "11. [Endogeneity Check — Interstate Links](#11-endogeneity-check--interstate-bank-links-only)\n"
-        "12. [Placebo — Intrastate Links](#12-placebo-check--intrastate-bank-links-only)\n"
-        "13. [Non-Geographic Bank Network](#13-non-geographic-bank-network)\n"
-        "14. [KNN Crossover Sweep](#14-knn-crossover-sweep)\n"
-        "15. [SEM Spatial Multiplier](#15-sem-spatial-multiplier-decomposition)\n"
-        "16. [SAR Multiplier Counterfactual](#16-sar-multiplier-counterfactual)\n"
-        "17. [SLX Exposure](#17-slx-exposure--bank-network-deregulation-spillover)\n"
-        "18. [Moran's I — Pre-Estimation](#18-morans-i--pre-estimation-diagnostics)\n"
-        "19. [Moran's I — Composite W](#19-morans-i-under-composite-w--credit-residuals)\n"
-        "20. [Moran's I — Bank Variants](#20-morans-i--bank-network-w-variants)\n"
-        "21. [Bank-Geography Overlap](#21-bank-geography-network-overlap)\n"
-        "22. [Time-Varying Lambda](#22-time-varying-lambda--year-specific-wbank)\n\n"
+        "1.  [Main SEM -- Credit Growth](#1-main-sem--credit-growth)\n"
+        "2.  [Four-W Comparison](#2-four-w-comparison--credit-growth)\n"
+        "3.  [Composite W Profile -- Credit](#3-composite-w-profile--credit-growth)\n"
+        "4.  [J-Test -- Model Selection](#4-j-test--non-nested-model-selection)\n"
+        "5.  [LM Diagnostics](#5-lm-diagnostics--credit-ols-residuals)\n"
+        "6.  [Conley SE Comparison](#6-conley-se-comparison)\n"
+        "7.  [FGLS Comparison](#7-fgls-comparison)\n"
+        "8.  [SAR Robustness Check](#8-sar-robustness-check)\n"
+        "9.  [Endogeneity Check -- Interstate Links](#9-endogeneity-check--interstate-bank-links-only)\n"
+        "10. [Placebo -- Intrastate Links](#10-placebo-check--intrastate-bank-links-only)\n"
+        "11. [Non-Geographic Bank Network](#11-non-geographic-bank-network)\n"
+        "12. [KNN Crossover Sweep](#12-knn-crossover-sweep)\n"
+        "13. [SEM Spatial Multiplier](#13-sem-spatial-multiplier-decomposition)\n"
+        "14. [SAR Multiplier Counterfactual](#14-sar-multiplier-counterfactual)\n"
+        "15. [SLX Exposure](#15-slx-exposure--bank-network-deregulation-spillover)\n"
+        "16. [Moran's I -- Pre-Estimation](#16-morans-i--pre-estimation-diagnostics)\n"
+        "17. [Moran's I -- Composite W](#17-morans-i-under-composite-w--credit-residuals)\n"
+        "18. [Moran's I -- Bank Variants](#18-morans-i--bank-network-w-variants)\n"
+        "19. [Bank-Geography Overlap](#19-bank-geography-network-overlap)\n"
+        "20. [W Matrix Density Summary](#20-w-matrix-density-summary)\n"
+        "21. [Hub Map -- Bank Network Centrality](#21-hub-map--bank-network-centrality)\n\n"
     )
 
     parts = [
-        "# Thesis Results Report\n\n",
+        "# Spatial Credit Analysis -- Results Report\n\n",
         f"*Auto-generated by `analysis/generate_report.py` on {ts}.*\n",
         "*Re-run `python analysis/generate_report.py` any time to incorporate new results.*\n\n",
         "---\n\n",
@@ -1414,7 +1352,6 @@ def build_report():
 
     builders = [
         sec_panel_fe_credit,
-        sec_panel_fe_hpi,
         sec_four_w,
         sec_composite_credit,
         sec_jtest,
@@ -1422,7 +1359,6 @@ def build_report():
         sec_conley,
         sec_fgls,
         sec_sar_robustness,
-        sec_sar_iv,
         sec_bank_interstate,
         sec_bank_intrastate,
         sec_bank_nongeo,
@@ -1434,8 +1370,10 @@ def build_report():
         sec_moran_composite,
         sec_moran_wbank,
         sec_bank_overlap,
-        sec_lambda_time,
+        sec_w_density,
+        sec_hub_map,
     ]
+    N_TOTAL = len(builders)
 
     found = 0
     for fn in builders:
@@ -1448,7 +1386,7 @@ def build_report():
             parts.append(chunk)
             parts.append("\n---\n")
 
-    parts.append(f"\n*Report covers {found}/22 analyses.*\n")
+    parts.append(f"\n*Report covers {found}/{N_TOTAL} analyses.*\n")
     return "".join(parts)
 
 
