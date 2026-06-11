@@ -1256,85 +1256,6 @@ Density statistics for every W matrix used in the analysis pipeline.
     return s
 
 
-def sec_hub_map():
-    """Hub county maps and centrality statistics."""
-    hub_csv = OUT / "hub_counties.csv"
-    str_csv = OUT / "bank_strength_centrality.csv"
-    map_a   = OUT / "hub_map_bank_strength.png"
-    map_b   = OUT / "hub_map_geo_transmission.png"
-
-    has_any = hub_csv.exists() or str_csv.exists()
-    if not has_any:
-        return ""
-
-    s = section("21. Hub Map -- Bank Network Centrality")
-    s += """
-**Source:** `analysis/extensions/hub_map.py`
-
-**References:** Favara & Imbs (2015); LeSage & Pace (2009); Bonacich (1987) *Power and Centrality*
-
----
-
-**Map (a) -- Bank-network in-strength centrality:**
-
-```
-strength_i = sum_j w^{raw}_{ji}     (column sum of un-row-standardised W_bank)     ...(45)
-```
-
-Captures how many other counties' bank portfolios are most similar to county i (in-degree in the raw cosine graph).
-High-strength counties are major recipients of bank-network similarity links.
-
-**Map (b) -- SEM total transmission receiver (W_geo, Full sample):**
-
-```
-S = (I - lambda * W_geo)^{-1}
-receiver_i = sum_{j != i} S_{ij}     (off-diagonal column sum)                     ...(46)
-```
-
-Captures the total shock absorbed by county i from the spatial error network.
-lambda = lambda_hat_geo (Full sample) from section 1.
-
-"""
-    if map_a.exists():
-        s += "![Bank-network in-strength centrality](hub_map_bank_strength.png)\n\n"
-    else:
-        s += "*hub_map_bank_strength.png not yet generated.*\n\n"
-
-    if map_b.exists():
-        s += "![SEM total transmission receiver](hub_map_geo_transmission.png)\n\n"
-    else:
-        s += "*hub_map_geo_transmission.png not yet generated.*\n\n"
-
-    # Top-10 table from hub_counties.csv (sender / receiver)
-    hub = load(hub_csv)
-    if hub is not None:
-        # Filter to credit only if outcome column present
-        if "outcome" in hub.columns:
-            hub = hub[hub["outcome"] == "credit"].copy()
-        # Top-10 by total_rx if present
-        if "total_rx" in hub.columns and len(hub) > 0:
-            s += "\n**Top-10 receiver counties (total transmission received, W_geo):**\n\n"
-            top = hub.nlargest(10, "total_rx")[["fips5", "total_rx"]].copy()
-            top.columns = ["FIPS5", "Total received"]
-            s += md_table(top)
-        # Top-10 by in_strength if present
-        if "in_strength" in hub.columns and len(hub) > 0:
-            s += "\n**Top-10 in-strength counties (W_bank centrality):**\n\n"
-            top = hub.nlargest(10, "in_strength")[["fips5", "in_strength"]].copy()
-            top.columns = ["FIPS5", "In-strength"]
-            s += md_table(top)
-
-    # Fallback: use bank_strength_centrality.csv
-    str_df = load(str_csv)
-    if hub is None and str_df is not None and "in_strength" in str_df.columns:
-        s += "\n**Top-10 in-strength counties (W_bank centrality):**\n\n"
-        top = str_df.nlargest(10, "in_strength")[["fips5", "in_strength"]].copy()
-        top.columns = ["FIPS5", "In-strength"]
-        s += md_table(top)
-
-    return s
-
-
 # ── Preserved (not in active builders) ────────────────────────────────────────
 # sec_sar_iv        -- deprecated (see output/deprecated/sar_iv_results.csv)
 # sec_lambda_time   -- deprecated (year-specific lambda removed from pipeline)
@@ -1378,7 +1299,6 @@ def build_report():
         sec_moran_wbank,
         sec_bank_overlap,
         sec_w_density,
-        sec_hub_map,
     ]
     N_TOTAL = len(builders)
 
