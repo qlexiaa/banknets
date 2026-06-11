@@ -1,0 +1,203 @@
+"""
+knn_crossover_credit.py
+========================
+Credit-DV parallel of knn_crossover.py.
+Dependent variable: Dl_nloans_b (dln commercial-bank mortgage loans).
+
+Sweeps k = 1..20 to find the crossover k where lambda_knn > lambda_geo for
+credit growth. Reference lambdas from panel_fe_credit_results.csv:
+  lam_geo_full = 0.1801
+  lam_geo_nb   = 0.1701
+
+Also reports density/sparsity of each W_bank_k matrix.
+
+Output: output/knn_sweep_credit_results.csv
+"""
+import warnings
+warnings.filterwarnings("ignore")
+
+import sys
+from pathlib import Path
+import numpy as np
+import scipy.sparse
+import pandas as pd
+import spreg
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
+import utils  # noqa
+from utils import row_standardize, sparse_to_pysal_w
+from panel_data import load_panel_with_credit
+
+ROOT        = Path(__file__).parents[2]
+COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
+WBANK_PATH  = ROOT / "data" / "W_bank_avg.npz"
+
+K_VALUES = list(range(1, 21))
+
+# Reference lambdas from sem_credit.py (will be overwritten from CSV if available)
+LAM_GEO_FULL   = 0.1801
+LAM_GEO_BORDER = 0.1701
+
+DV = "Dl_nloans_b"
+
+
+def build_wbank_knn(W_sparse, k):
+    """Keep top-k weights per row, re-standardise. Returns scipy CSR."""
+    W = W_sparse.toarray().astype(np.float64)
+    np.fill_diagonal(W, 0.0)
+    N = W.shape[0]
+    W_knn = np.zeros_like(W)
+    for i in range(N):
+        row = W[i]
+        nz  = np.count_nonzero(row)
+        if nz == 0:
+            continue
+        if nz <= k:
+            W_knn[i] = row
+        else:
+            top_k = np.argpartition(row, -k)[-k:]
+            W_knn[i, top_k] = row[top_k]
+    np.fill_diagonal(W_knn, 0.0)
+    rs = W_knn.sum(axis=1, keepdims=True)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        W_knn = np.where(rs > 0, W_knn / rs, 0.0)
+    return scipy.sparse.csr_matrix(W_knn)
+
+
+def build_arrays(panel_sub, county_order, W_knn_all, YEARS, year_pos, sample_label):
+    """Build long-format arrays for Panel_FE_Error with y = Dl_nloans_b."""
+    T       = len(YEARS)
+    any_nan = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+    sub_co  = set(panel_sub["fips5"].unique())
+    usable  = [c for c in county_order
+               if c in sub_co and not any_nan.get(c, True)]
+    N       = len(usable)
+    u_pos   = {c: i for i, c in enumerate(usable)}
+
+    df = (panel_sub[panel_sub["fips5"].isin(set(usable))]
+          .assign(t_idx=lambda d: d["year"].map(year_pos),
+                  c_idx=lambda d: d["fips5"].map(u_pos))
+          .sort_values(["t_idx", "c_idx"]))
+
+    y_long       = df[DV].values.reshape(-1, 1)
+    t_idx_vec    = df["t_idx"].values
+    year_dummies = np.column_stack([
+        (t_idx_vec == year_pos[yr]).astype(np.float64) for yr in YEARS[1:]])
+    x_long = np.hstack([df["Linter_bra"].values.reshape(-1, 1), year_dummies])
+
+    assert not np.isnan(y_long).any()
+    assert y_long.shape == (N * T, 1)
+    assert x_long.shape == (N * T, 11)
+
+    idx       = np.array([county_order.index(c) for c in usable])
+    W_knn_sub = row_standardize(W_knn_all[idx, :][:, idx])
+    return y_long, x_long, sparse_to_pysal_w(W_knn_sub), N
+
+
+def run_fe(y, x, w, w_label, ds_label, YEARS):
+    nx = ["Linter_bra"] + [f"yr{yr}" for yr in YEARS[1:]]
+    return spreg.Panel_FE_Error(
+        y, x, w, name_y=DV, name_x=nx, name_w=w_label, name_ds=ds_label)
+
+
+def run(output_dir=None):
+    if output_dir is not None:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    co_df        = pd.read_csv(COUNTY_PATH, dtype={"fips5": str})
+    county_order = co_df["fips5"].str.zfill(5).tolist()
+    N_ALL        = len(county_order)
+
+    W_bank_raw = scipy.sparse.load_npz(WBANK_PATH)
+    W_bank_all = row_standardize(W_bank_raw)
+
+    panel    = load_panel_with_credit()
+    YEARS    = sorted(panel["year"].unique())
+    T        = len(YEARS)
+    year_pos = {yr: i for i, yr in enumerate(YEARS)}
+    panel_border = panel[panel["border"] == 1].copy()
+
+    sweep_rows = []
+    for k in K_VALUES:
+        print(f"  k={k} ...", flush=True)
+        W_knn_all = build_wbank_knn(W_bank_all, k)
+
+        nz  = W_knn_all.nnz - (W_knn_all.diagonal() != 0).sum()
+        tot = N_ALL * (N_ALL - 1)
+        density  = nz / tot
+        sparsity = 1.0 - density
+        avg_nbrs = nz / N_ALL
+
+        y_f, x_f, w_knn_f, N_f = build_arrays(
+            panel, county_order, W_knn_all, YEARS, year_pos, "Full")
+        res_f = run_fe(y_f, x_f, w_knn_f, f"W_bank_k{k}", "Full", YEARS)
+        lam_f = float(res_f.lam)
+
+        y_b, x_b, w_knn_b, N_b = build_arrays(
+            panel_border, county_order, W_knn_all, YEARS, year_pos, "Border")
+        res_b = run_fe(y_b, x_b, w_knn_b, f"W_bank_k{k}", "Border", YEARS)
+        lam_b = float(res_b.lam)
+
+        sweep_rows.append(dict(
+            k                  = k,
+            n_links            = nz,
+            possible_links     = tot,
+            density            = density,
+            sparsity           = sparsity,
+            avg_nbrs           = avg_nbrs,
+            lam_geo            = LAM_GEO_FULL,
+            lam_bank_knn       = lam_f,
+            gap                = lam_f  - LAM_GEO_FULL,
+            n_co               = N_f,
+            n_obs              = N_f  * T,
+            lam_geo_border     = LAM_GEO_BORDER,
+            lam_bank_knn_border= lam_b,
+            gap_border         = lam_b - LAM_GEO_BORDER,
+            n_co_border        = N_b,
+            n_obs_border       = N_b * T,
+        ))
+
+    df_sweep = pd.DataFrame(sweep_rows)
+
+    # ── Print table ───────────────────────────────────────────────────────────
+    W = 98
+    print()
+    print("=" * W)
+    print(f"KNN crossover sweep -- DV: {DV}")
+    print(f"Ref lambda: geo_full={LAM_GEO_FULL}  geo_border={LAM_GEO_BORDER}")
+    print(f"Gap = lam_knn - lam_geo  |  '<<' marks first k where gap > 0")
+    print("=" * W)
+    print(f"{'k':>4}  {'density':>9} {'sparsity':>9} {'avg_nbrs':>8}  "
+          f"{'lam_knn(F)':>11} {'gap(F)':>8}  {'lam_knn(B)':>11} {'gap(B)':>8}")
+    print("-" * W)
+    cross_f = None
+    cross_b = None
+    for row in sweep_rows:
+        tag_f = " <<" if row["gap"]        > 0 and cross_f is None else "   "
+        tag_b = " <<" if row["gap_border"] > 0 and cross_b is None else "   "
+        if row["gap"]        > 0 and cross_f is None: cross_f = row["k"]
+        if row["gap_border"] > 0 and cross_b is None: cross_b = row["k"]
+        print(f"{row['k']:>4}  {row['density']:>9.5f} {row['sparsity']:>9.5f} "
+              f"{row['avg_nbrs']:>8.2f}  {row['lam_bank_knn']:>11.4f} "
+              f"{row['gap']:>+8.4f}{tag_f}  {row['lam_bank_knn_border']:>11.4f} "
+              f"{row['gap_border']:>+8.4f}{tag_b}")
+
+    print()
+    cf = cross_f if cross_f is not None else ">20"
+    cb = cross_b if cross_b is not None else ">20"
+    print(f"Crossover k: full={cf}  border={cb}")
+    print("=" * W)
+
+    if output_dir is not None:
+        cols = ["k","n_links","possible_links","density","sparsity","avg_nbrs",
+                "lam_geo","lam_bank_knn","gap","n_co","n_obs",
+                "lam_geo_border","lam_bank_knn_border","gap_border","n_co_border","n_obs_border"]
+        df_sweep[cols].to_csv(output_dir / "knn_sweep_credit_results.csv", index=False)
+        print(f"\nSaved knn_sweep_credit_results.csv to {output_dir}")
+
+    return df_sweep
+
+
+if __name__ == '__main__':
+    run(Path(__file__).parents[2] / 'output')

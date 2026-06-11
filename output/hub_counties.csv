@@ -8,7 +8,7 @@ credit,W_geo,sender,6,51735,Virginia,0.2144249361149064
 credit,W_geo,sender,7,34007,New Jersey,0.21427335624481264
 credit,W_geo,sender,8,34029,New Jersey,0.21424812463309093
 credit,W_geo,sender,9,29510,Missouri,0.21422269933807203
-credit,W_geo,sender,10,34013,New Jersey,0.21418773857654017
+credit,W_geo,sender,10,34013,New Jersey,0.2141877385765402
 credit,W_geo,receiver,1,51041,Virginia,0.6113334562572428
 credit,W_geo,receiver,2,08059,Colorado,0.5460152690687491
 credit,W_geo,receiver,3,51003,Virginia,0.5312984299272786
@@ -19,46 +19,46 @@ credit,W_geo,receiver,7,17119,Illinois,0.46780704760487063
 credit,W_geo,receiver,8,40143,Oklahoma,0.45960571078350637
 credit,W_geo,receiver,9,13095,Georgia,0.4537867201206437
 credit,W_geo,receiver,10,47065,Tennessee,0.44896956754703343
-credit,W_bank,sender,1,13289,Georgia,2.322531912317885
-credit,W_bank,sender,2,13169,Georgia,2.322510956574347
-credit,W_bank,sender,3,01063,Alabama,2.322447601682505
-credit,W_bank,sender,4,13221,Georgia,2.322219802548532
-credit,W_bank,sender,5,21223,Kentucky,2.322179398544968
-credit,W_bank,sender,6,48051,Texas,2.3221569773700006
-credit,W_bank,sender,7,37053,North Carolina,2.3219527247576077
-credit,W_bank,sender,8,47057,Tennessee,2.3219310667363464
-credit,W_bank,sender,9,48055,Texas,2.3217893770822937
-credit,W_bank,sender,10,05025,Arkansas,2.3217134831279473
-credit,W_bank,receiver,1,47037,Tennessee,5.001880200809505
-credit,W_bank,receiver,2,12073,Florida,4.883264782915798
-credit,W_bank,receiver,3,12021,Florida,4.876233253427248
-credit,W_bank,receiver,4,47187,Tennessee,4.867356933333339
-credit,W_bank,receiver,5,47149,Tennessee,4.755822190046116
-credit,W_bank,receiver,6,51740,Virginia,4.74692227206295
-credit,W_bank,receiver,7,47021,Tennessee,4.7099060881447885
-credit,W_bank,receiver,8,16019,Idaho,4.690828678215385
-credit,W_bank,receiver,9,12115,Florida,4.616622165298297
-credit,W_bank,receiver,10,13021,Georgia,4.593360184753215
-hpi,W_geo,sender,1,51760,Virginia,2.656617432593649
-hpi,W_geo,sender,2,51670,Virginia,2.6522695527089324
-hpi,W_geo,sender,3,51830,Virginia,2.644412582889161
-hpi,W_geo,sender,4,51540,Virginia,2.6215443407746406
-hpi,W_geo,sender,5,51735,Virginia,2.6202571207698733
-hpi,W_geo,sender,6,34029,New Jersey,2.6152662795050032
-hpi,W_geo,sender,7,13149,Georgia,2.613194245959107
-hpi,W_geo,sender,8,51570,Virginia,2.6117690756585183
-hpi,W_geo,sender,9,51036,Virginia,2.6109647823438746
-hpi,W_geo,sender,10,13113,Georgia,2.6105415254714432
-hpi,W_geo,receiver,1,51041,Virginia,6.395196429060472
-hpi,W_geo,receiver,2,08059,Colorado,6.2006392255057285
-hpi,W_geo,receiver,3,17119,Illinois,5.357910017659889
-hpi,W_geo,receiver,4,13121,Georgia,5.350373463368518
-hpi,W_geo,receiver,5,42125,Pennsylvania,5.230708276282487
-hpi,W_geo,receiver,6,51161,Virginia,5.134667575952412
-hpi,W_geo,receiver,7,51003,Virginia,5.087991803345366
-hpi,W_geo,receiver,8,51095,Virginia,4.995135820238553
-hpi,W_geo,receiver,9,47065,Tennessee,4.9777855705908225
-hpi,W_geo,receiver,10,21111,Kentucky,4.8838652961629965
+credit,W_bank,sender,1,13289,Georgia,2.1857164941895686
+credit,W_bank,sender,2,13169,Georgia,2.185695609879734
+credit,W_bank,sender,3,01063,Alabama,2.185634652924106
+credit,W_bank,sender,4,13221,Georgia,2.1854151846959007
+credit,W_bank,sender,5,21223,Kentucky,2.1853761102313753
+credit,W_bank,sender,6,48051,Texas,2.18535582070146
+credit,W_bank,sender,7,37053,North Carolina,2.185158100553701
+credit,W_bank,sender,8,47057,Tennessee,2.185136908967549
+credit,W_bank,sender,9,48055,Texas,2.185004399843858
+credit,W_bank,sender,10,05025,Arkansas,2.184927865452623
+credit,W_bank,receiver,1,47037,Tennessee,4.704823773179374
+credit,W_bank,receiver,2,12073,Florida,4.616814405173028
+credit,W_bank,receiver,3,12021,Florida,4.57786255922591
+credit,W_bank,receiver,4,47187,Tennessee,4.577403779039725
+credit,W_bank,receiver,5,47149,Tennessee,4.470898907986459
+credit,W_bank,receiver,6,51740,Virginia,4.443766192037807
+credit,W_bank,receiver,7,47021,Tennessee,4.417283372114527
+credit,W_bank,receiver,8,16019,Idaho,4.3987576729511675
+credit,W_bank,receiver,9,12115,Florida,4.3361303398942646
+credit,W_bank,receiver,10,13021,Georgia,4.313034802034905
+hpi,W_geo,sender,1,51760,Virginia,2.6566174324431895
+hpi,W_geo,sender,2,51670,Virginia,2.6522695525588604
+hpi,W_geo,sender,3,51830,Virginia,2.644412582739365
+hpi,W_geo,sender,4,51540,Virginia,2.6215443406257384
+hpi,W_geo,sender,5,51735,Virginia,2.6202571206212277
+hpi,W_geo,sender,6,34029,New Jersey,2.6152662793564363
+hpi,W_geo,sender,7,13149,Georgia,2.6131942458105257
+hpi,W_geo,sender,8,51570,Virginia,2.611769075510085
+hpi,W_geo,sender,9,51036,Virginia,2.6109647821966995
+hpi,W_geo,sender,10,13113,Georgia,2.610541525323657
+hpi,W_geo,receiver,1,51041,Virginia,6.395196428715736
+hpi,W_geo,receiver,2,08059,Colorado,6.200639225160966
+hpi,W_geo,receiver,3,17119,Illinois,5.357910017361643
+hpi,W_geo,receiver,4,13121,Georgia,5.350373463056841
+hpi,W_geo,receiver,5,42125,Pennsylvania,5.2307082759800485
+hpi,W_geo,receiver,6,51161,Virginia,5.13466757567259
+hpi,W_geo,receiver,7,51003,Virginia,5.08799180308891
+hpi,W_geo,receiver,8,51095,Virginia,4.9951358199558396
+hpi,W_geo,receiver,9,47065,Tennessee,4.977785570320296
+hpi,W_geo,receiver,10,21111,Kentucky,4.883865295885417
 hpi,W_bank,sender,1,13169,Georgia,42.05268410316237
 hpi,W_bank,sender,2,01063,Alabama,42.05254658628658
 hpi,W_bank,sender,3,13289,Georgia,42.052478318151195
