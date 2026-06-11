@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pyreadstat
+import scipy.sparse
 
 from utils import row_standardize, sparse_to_pysal_w
 
@@ -107,6 +108,33 @@ def get_common_sample(panel, county_order, W_geo_all, W_bank_all, dv="Dl_nloans_
     -------
     usable : list of fips5 strings in county_order order, safe under both W
     """
+    expected_shape = (len(county_order), len(county_order))
+    for name, W in (("W_geo_all", W_geo_all), ("W_bank_all", W_bank_all)):
+        if not isinstance(W, scipy.sparse.spmatrix):
+            raise ValueError(
+                f"{name} must be a scipy.sparse matrix with expected shape "
+                f"{expected_shape}; got {type(W).__name__}."
+            )
+        if W.shape[0] != W.shape[1]:
+            raise ValueError(
+                f"{name} must be square with expected shape {expected_shape}; "
+                f"got shape {W.shape}."
+            )
+
+    if W_geo_all.shape != W_bank_all.shape:
+        raise ValueError(
+            "W_geo_all and W_bank_all must have identical shapes with "
+            f"expected shape {expected_shape}; got W_geo_all shape "
+            f"{W_geo_all.shape} and W_bank_all shape {W_bank_all.shape}."
+        )
+    if W_geo_all.shape[0] != len(county_order):
+        raise ValueError(
+            "W_geo_all and W_bank_all must align to county_order with "
+            f"expected shape {expected_shape}; got W_geo_all shape "
+            f"{W_geo_all.shape}, W_bank_all shape {W_bank_all.shape}, and "
+            f"len(county_order)={len(county_order)}."
+        )
+
     # (a) counties with any missing dv
     any_nan = panel.groupby("fips5")[dv].apply(lambda s: s.isna().any())
     sub_co  = set(panel["fips5"].unique())

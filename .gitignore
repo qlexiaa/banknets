@@ -37,5 +37,3 @@ Thumbs.db
 # Tool / editor configs
 .claude/
 
-# Deprecated generated outputs
-output/deprecated/
