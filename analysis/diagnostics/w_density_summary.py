@@ -12,9 +12,9 @@ For each matrix reports:
   pct_isolated   -- % of rows with zero off-diagonal weight
 
 Matrices covered:
-  W_geo, W_bank, W_bank_count, W_bank_binary, W_bank_knn4,
+  W_geo, W_bank, W_bank_count, W_bank_bin, W_bank_knn4,
   W_bank_nonGeo, W_bank_interstate, W_bank_intrastate,
-  W_bank_knn (k = 1, 2, 4, 8, 15, 20)
+  W_bank_knn_ (k = 1, 2, 4, 8, 15, 20)
 
 Output
 ------
@@ -106,7 +106,7 @@ def run(output_dir=None):
         ("W_geo",              W_geo_all),
         ("W_bank",             bank_vars["W_bank"]),
         ("W_bank_count",       bank_vars["W_bank_count"]),
-        ("W_bank_binary",      bank_vars["W_bank_binary"]),
+        ("W_bank_bin",         bank_vars["W_bank_binary"]),
         ("W_bank_knn4",        bank_vars["W_bank_knn4"]),
         ("W_bank_nonGeo",      bank_vars["W_bank_nonGeo"]),
         ("W_bank_interstate",  bank_vars["W_bank_interstate"]),
@@ -122,7 +122,7 @@ def run(output_dir=None):
     W_bank_raw = bank_vars["W_bank"]
     for k in KNN_SELECTED:
         W_knn = _build_knn(W_bank_raw, k)
-        label = f"W_bank_knn{k}"
+        label = f"W_bank_knn_{k}"
         rows.append(_row_stats(W_knn, label))
         print(f"  {label:<24}: density={rows[-1]['density_pct']:.4f}%  "
               f"mean_nbrs={rows[-1]['mean_nbrs']:.2f}  "

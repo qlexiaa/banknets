@@ -731,10 +731,10 @@ def print_comparison_table(results_by_sample, sar_df, conley_df_csv):
 
     def sample_mask(series, sample_label):
         labels = {sample_label}
-        if sample_label == "NonBorder":
-            labels.add("Non-border")
-        elif sample_label == "Non-border":
-            labels.add("NonBorder")
+        if sample_label == "NonContig":
+            labels.add("Non-contig")
+        elif sample_label == "Non-contig":
+            labels.add("NonContig")
         return series.isin(labels)
 
     # ── Read ML-SAR results from sar_robustness_credit.csv ─────────────────
@@ -853,10 +853,10 @@ def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
 
     def sample_mask(series, sample_label):
         labels = {sample_label}
-        if sample_label == "NonBorder":
-            labels.add("Non-border")
-        elif sample_label == "Non-border":
-            labels.add("NonBorder")
+        if sample_label == "NonContig":
+            labels.add("Non-contig")
+        elif sample_label == "Non-contig":
+            labels.add("NonContig")
         return series.isin(labels)
 
     def _row(sample_label, est_label):
@@ -1028,10 +1028,10 @@ def run(output_dir=None):
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
     panel_border = panel[panel["border"] == 1].copy()
 
-    # IV-SAR runs for Full and Border samples only
-    # (NonBorder excluded: border-discontinuity IV requires the border sample;
-    #  NonBorder instruments are severely weak under dense W_bank)
-    samples = [("Full", panel), ("Border", panel_border)]
+    # IV-SAR runs for Full and Contig samples only
+    # (NonContig excluded: border-discontinuity IV requires the contig sample;
+    #  NonContig instruments are severely weak under dense W_bank)
+    samples = [("Full", panel), ("Contig", panel_border)]
 
     # ── Load existing results for comparison table ────────────────────────────
     sar_df = pd.read_csv(SAR_CSV) if SAR_CSV.exists() else pd.DataFrame()
@@ -1108,8 +1108,11 @@ def run(output_dir=None):
                     N_counties            = r_sdm["N_counties"],
                     N_obs                 = r_sdm["N_obs"],
                 ))
-            except Exception as exc:
-                print(f"  [WARN] SDM-IV {sample_label} {W_label} failed: {exc}")
+            except (ValueError, np.linalg.LinAlgError) as exc:
+                print(
+                    f"  [WARN] SDM-IV {sample_label} {W_label} skipped "
+                    f"after numerical/data failure: {exc}"
+                )
 
     # ── Print formatted comparison table ──────────────────────────────────────
     print_comparison_table(all_iv_results, sar_df, conley_df_csv)

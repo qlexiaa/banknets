@@ -47,9 +47,12 @@ def stars(p):
         pf = float(p)
         if pd.isna(pf):
             return ""
-        if pf < 0.01:  return "***"
-        if pf < 0.05:  return "**"
-        if pf < 0.10:  return "*"
+        if pf < 0.01:
+            return "***"
+        if pf < 0.05:
+            return "**"
+        if pf < 0.10:
+            return "*"
         return ""
     except (TypeError, ValueError):
         return ""
@@ -59,7 +62,8 @@ def pval_str(p):
         pf = float(p)
         if pd.isna(pf):
             return "--"
-        if pf < 0.001: return "<0.001"
+        if pf < 0.001:
+            return "<0.001"
         return f"{pf:.3f}"
     except (TypeError, ValueError):
         return str(p)

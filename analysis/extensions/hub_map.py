@@ -39,7 +39,7 @@ import scipy.sparse
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from utils import row_standardize
-from w_variants import load_w_geo, load_bank_variants
+from w_variants import load_w_geo
 from panel_data import load_panel_with_credit
 
 ROOT         = Path(__file__).parents[2]
@@ -111,19 +111,19 @@ def run(output_dir=None):
     county_order = co_df["fips5"].str.zfill(5).tolist()
 
     W_geo_sp, _  = load_w_geo(county_order)
-    bank_vars    = load_bank_variants(county_order, W_geo_all=W_geo_sp)
-    W_bank_sp    = bank_vars["W_bank"]
 
     # ── Map (a): bank-network strength centrality (col sums, UN-standardised) ─
     print("Computing bank-network in-strength centrality ...")
     # Use the raw (not row-standardised) cosine W_bank
-    # (bank_vars["W_bank"] is already row-standardised; re-load raw cosine)
     W_bank_raw_path = ROOT / "data" / "W_bank.npz"
-    if W_bank_raw_path.exists():
-        W_bank_raw = scipy.sparse.load_npz(str(W_bank_raw_path))
-    else:
-        W_bank_raw = W_bank_sp  # fallback to row-standardised
-        print("  [NOTE] Raw W_bank.npz not found; using row-standardised W_bank")
+    if not W_bank_raw_path.exists():
+        raise FileNotFoundError(
+            f"Raw W_bank file not found: {W_bank_raw_path}. "
+            "Cannot compute raw cosine in-strength centrality."
+        )
+    W_bank_raw = scipy.sparse.load_npz(str(W_bank_raw_path)).tocsr(copy=True)
+    W_bank_raw.setdiag(0)
+    W_bank_raw.eliminate_zeros()
 
     col_sums = np.array(W_bank_raw.sum(axis=0)).flatten()
     strength_df = pd.DataFrame({
