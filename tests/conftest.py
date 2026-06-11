@@ -65,8 +65,9 @@ class FakeSparse:
     def sum(self, axis=None):
         result = self._data.sum(axis=axis)
         if axis is not None:
-            # scipy.sparse.sum returns a matrix; mimic that shape
-            return np.asmatrix(result.reshape(-1, 1) if axis == 1 else result.reshape(1, -1))
+            # scipy.sparse.sum returns a 2D result for axis sums; keep that
+            # shape without constructing the deprecated np.matrix subclass.
+            return result.reshape(-1, 1) if axis == 1 else result.reshape(1, -1)
         return result
 
     def __gt__(self, val):
@@ -94,7 +95,7 @@ class _BoolSparse:
     def sum(self, axis=None):
         result = self._mask.sum(axis=axis)
         if axis is not None:
-            return np.asmatrix(result.reshape(-1, 1) if axis == 1 else result.reshape(1, -1))
+            return result.reshape(-1, 1) if axis == 1 else result.reshape(1, -1)
         return result
 
 
