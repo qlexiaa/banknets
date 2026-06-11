@@ -60,11 +60,21 @@ def pval_str(p):
     except (TypeError, ValueError):
         return str(p)
 
+def fmti(x):
+    """Safe integer formatter — returns '—' for NaN/None."""
+    try:
+        if pd.isna(x):
+            return "—"
+        return f"{int(x):,}"
+    except (TypeError, ValueError):
+        return str(x)
+
 def load(path):
     p = Path(path)
     if not p.exists():
         return None
-    return pd.read_csv(p)
+    df = pd.read_csv(p)
+    return df.dropna(how="all").reset_index(drop=True)
 
 def section(title, level=2):
     return f"\n{'#' * level} {title}\n"
@@ -166,8 +176,8 @@ Note: SE(gap) ignores the covariance between estimators (conservative).
             "Model": r.get("model", f"{r.get('w_matrix','')} ({r.get('sample','')})"),
             "β (deregulation)": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
             "λ (spatial)": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
-            "N counties": fmt(int(r["n_co"])),
-            "N obs": fmt(int(r["n_obs"])),
+            "N counties": fmti(r["n_co"]),
+            "N obs": fmti(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     s += "\n*Standard errors in parentheses. \\*p<0.10, \\*\\*p<0.05, \\*\\*\\*p<0.01*\n"
@@ -222,7 +232,7 @@ where:
             "β_Dη": f"{fmt(r['beta_Deta'])} ({fmt(r['beta_Deta_se'])}){stars(0.001)}",
             "λ": f"{fmt(r['lambda'])} ({fmt(r['lambda_se'])}){stars(0.001)}",
             "Δλ (bank−geo)": gap_str if gap_str else "—",
-            "N counties": fmt(int(r["n_counties"])),
+            "N counties": fmti(r["n_counties"]),
         })
     s += md_table(pd.DataFrame(rows))
     s += "\n*Standard errors in parentheses.*\n"
@@ -278,7 +288,7 @@ LR = 2 · (logLL_alt - logLL_geo) ~ χ²(1) under H₀
             "β": f"{fmt(r['beta'])} ({fmt(r['se_beta'])}){stars(r['p_beta'])}",
             "λ": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
             "Δλ vs W_geo": gap_str,
-            "N obs": fmt(int(r["n_obs"])),
+            "N obs": fmti(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     s += "\n*Standard errors in parentheses. Gap is one-sided z-test (H₁: λ_alt > λ_geo).*\n"
@@ -326,7 +336,7 @@ Interpretation: α* = 1 → pure geographic; α* = 0 → pure bank-network.
 
 """
     rows = []
-    for _, r in opt.iterrows():
+    for _, r in opt.dropna(subset=["alpha_star"]).iterrows():
         rows.append({
             "Pair": r["pair"],
             "W_alt": r["w_alt"],
@@ -542,7 +552,7 @@ p  = 2 · Φ(-|t|)     (two-sided normal)          ...(17)
 
 """
     rows = []
-    for _, r in df.iterrows():
+    for _, r in df.dropna(subset=["beta"]).iterrows():
         rows.append({
             "Sample": r["sample"],
             "Estimator": r["estimator"],
@@ -632,23 +642,23 @@ t_diff = (β_OLS - β_FGLS) / sqrt(SE_OLS² + SE_FGLS²)     ...(23)
 
 """
     rows = []
-    for _, r in df.iterrows():
+    for _, r in df.dropna(subset=["beta"]).iterrows():
         rows.append({
             "Sample": r["sample"],
             "Estimator": r["estimator"],
             "β": f"{fmt(r['beta'])} ({fmt(r['se'])}){stars(r['p_value'])}",
             "95% CI": f"[{fmt(r['ci_lower'])}, {fmt(r['ci_upper'])}]",
-            "N counties": fmt(int(r["N"])),
+            "N counties": fmti(r["N"]),
         })
     s += md_table(pd.DataFrame(rows))
 
     if ht is not None:
         s += "\n**Hausman test and residual Moran's I:**\n\n"
         ht_rows = []
-        for _, r in ht.iterrows():
+        for _, r in ht.dropna(subset=["t_diff"]).iterrows():
             ht_rows.append({
                 "Sample": r["sample"],
-                "Hausman note": r["hausman_note"],
+                "Hausman note": fmt(r["hausman_note"]),
                 "t_diff": f"{fmt(r['t_diff'], 3)}{stars(r['p_diff'])}",
                 "Mean Moran's I (resid)": fmt(r["moran_mean_I"]),
                 "p (Moran, mean)": pval_str(r["moran_mean_p"]),
@@ -700,7 +710,7 @@ z = Δρ / sqrt(SE(ρ̂_bank)² + SE(ρ̂_geo)²)
             "ρ (spatial lag)": f"{fmt(r['rho'])} ({fmt(r['rho_se'])}){stars(0.001)}",
             "β (deregulation)": f"{fmt(r['beta_D'])} ({fmt(r['beta_D_se'])}){stars(0.001)}",
             "Δρ (bank−geo)": gap_str,
-            "N obs": fmt(int(r["n_obs"])),
+            "N obs": fmti(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     s += "\n*SAR ρ is analogous to SEM λ but governs the outcome (not the error) process.*\n"
@@ -757,7 +767,7 @@ Step 6: Moran's I on SAR residuals (year-by-year, eq. 28 below)
 
 """
     rows = []
-    for _, r in df.iterrows():
+    for _, r in df.dropna(subset=["rho"]).iterrows():
         rows.append({
             "Sample": r["sample"],
             "W": r["W"],
@@ -765,7 +775,7 @@ Step 6: Moran's I on SAR residuals (year-by-year, eq. 28 below)
             "β": f"{fmt(r['beta'])} ({fmt(r['beta_se'])})",
             "1st stage F": fmt(r["first_stage_F"], 1),
             "Moran I (resid, mean)": fmt(r["residual_moran_i_mean"]),
-            "N obs": fmt(int(r["N_obs"])),
+            "N obs": fmti(r["N_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     s += "\n*IV-SAR can be unstable when first-stage F < 10. Non-border sample instruments are weak.*\n"
@@ -804,12 +814,12 @@ followed by row-standardisation.
 
 """
     rows = []
-    for _, r in df.iterrows():
+    for _, r in df.dropna(subset=["lam"]).iterrows():
         rows.append({
             "Model": r["model"],
             "β": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
             "λ": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
-            "N obs": fmt(int(r["n_obs"])),
+            "N obs": fmti(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     return s
@@ -845,12 +855,12 @@ followed by row-standardisation.
 
 """
     rows = []
-    for _, r in df.iterrows():
+    for _, r in df.dropna(subset=["lam"]).iterrows():
         rows.append({
             "Model": r["model"],
             "β": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
             "λ": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
-            "N obs": fmt(int(r["n_obs"])),
+            "N obs": fmti(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     return s
@@ -886,12 +896,12 @@ followed by row-standardisation. This removes all bank-network links that coinci
 
 """
     rows = []
-    for _, r in df.iterrows():
+    for _, r in df.dropna(subset=["lam"]).iterrows():
         rows.append({
             "Model": r["model"],
             "β": f"{fmt(r.get('beta', r.get('beta_D','')))} ({fmt(r.get('se_beta', r.get('se_beta_D','')))}){stars(r.get('p_beta', 0.001))}",
             "λ": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
-            "N obs": fmt(int(r["n_obs"])),
+            "N obs": fmti(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     return s
@@ -942,7 +952,7 @@ followed by row-standardisation. k sweeps from 1 to 20.
     rows = []
     for _, r in sub.iterrows():
         rows.append({
-            "k": int(r["k"]),
+            "k": fmti(r["k"]),
             "Density (%)": fmt(r["density"] * 100, 3),
             "λ_knn (full)": fmt(r["lam_bank_knn"]),
             "gap (full)": fmt(r["gap"]),
@@ -1129,7 +1139,7 @@ p_perm = #{|beta^pi_E| >= |beta_E_obs|} / 999     ...(39)
             "beta_D (SE)": f"{fmt(r['beta_D'])} ({fmt(r['se_D'])}){stars(r['p_D'])}",
             "beta_E (SE)": beta_e_str,
             "p_perm": perm_str,
-            "N obs": fmt(int(r["n_obs"])),
+            "N obs": fmti(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
     s += "\n*Standard errors in parentheses. p_perm: permutation-based p-value for beta_E.*\n"
@@ -1186,14 +1196,14 @@ p_perm = #{|I^pi| >= |I_obs|} / 999              ...(43)
                .reset_index())
     rows = [{"Outcome": r["outcome"],
              "Mean Moran's I": fmt(r["mean_I"]),
-             "Significant years / total": f"{int(r['sig_years'])}/{int(r['total_years'])}"}
+             "Significant years / total": f"{fmti(r['sig_years'])}/{fmti(r['total_years'])}"}
             for _, r in summary.iterrows()]
     s += md_table(pd.DataFrame(rows))
 
     s += "\n**Year-by-year (county level):**\n\n"
     sub = df[df["level"] == "county"][
         ["year", "outcome", "moran_I", "z_score", "p_value", "significant"]].copy()
-    rows2 = [{"Year": int(r["year"]), "Outcome": r["outcome"],
+    rows2 = [{"Year": fmti(r["year"]), "Outcome": r["outcome"],
                "Moran's I": fmt(r["moran_I"]), "z": fmt(r["z_score"], 2),
                "p": pval_str(r["p_value"]), "Sig": "Y" if r["significant"] else ""}
              for _, r in sub.iterrows()]
@@ -1226,7 +1236,7 @@ A lower Moran's I at alpha* validates the composite weighting approach.
             "W matrix": r["w_matrix"],
             "alpha": fmt(r["alpha"]),
             "Mean Moran's I": fmt(r["mean_moran_I"]),
-            "Sig. years": f"{int(r['significant_years'])}/{int(r['n_years'])}",
+            "Sig. years": f"{fmti(r['significant_years'])}/{fmti(r['n_years'])}",
         })
     s += md_table(pd.DataFrame(rows))
     return s
@@ -1254,7 +1264,7 @@ Lower Moran's I = better residual whitening.
     rows = [{"Outcome": r["outcome"], "W matrix": r["w_matrix"],
               "Mean Moran's I": fmt(r["mean_moran_I"]),
               "Median Moran's I": fmt(r["median_moran_I"]),
-              "Sig. years": f"{int(r['significant_years'])}/{int(r['n_years'])}",
+              "Sig. years": f"{fmti(r['significant_years'])}/{fmti(r['n_years'])}",
               "Density": fmt(r["density"] * 100, 3) + "%"}
              for _, r in non_knn.iterrows()]
     s += md_table(pd.DataFrame(rows))
@@ -1340,12 +1350,12 @@ gap_t = lambda_bank,t - lambda_geo,t     ...(47)
     rows = []
     for _, r in df.iterrows():
         rows.append({
-            "Year": int(r["year"]),
+            "Year": fmti(r["year"]),
             "lambda_geo (SE)": f"{fmt(r['lam_geo'])} ({fmt(r['se_lam_geo'])})",
             "lambda_bank (SE)": f"{fmt(r['lam_bank'])} ({fmt(r['se_lam_bank'])})",
             "Gap": fmt(r["gap"]),
-            "N geo": fmt(int(r["n_geo"])),
-            "N bank": fmt(int(r["n_bank"])),
+            "N geo": fmti(r["n_geo"]),
+            "N bank": fmti(r["n_bank"]),
         })
     s += md_table(pd.DataFrame(rows))
 

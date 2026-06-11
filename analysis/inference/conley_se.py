@@ -489,9 +489,10 @@ def run(output_dir=None):
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
     YEARS    = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
-    panel_border = panel[panel["border"] == 1].copy()
+    panel_border    = panel[panel["border"] == 1].copy()
+    panel_nonborder = panel[panel["border"] == 0].copy()
 
-    samples = [("Full", panel), ("Border", panel_border)]
+    samples = [("Full", panel), ("Border", panel_border), ("NonBorder", panel_nonborder)]
 
     # -- Estimate + compute SEs for each sample -------------------------------
     all_results = {}
@@ -551,10 +552,11 @@ def run(output_dir=None):
         print("=" * W)
 
     # -- Verify state SE against Favara-Imbs baseline -------------------------
-    fi_se   = all_results["Full"]["State clustering (Favara-Imbs)"]["se"]
-    fi_beta = all_results["Full"]["State clustering (Favara-Imbs)"]["beta"]
-    print()
-    print(f"State-cluster SE check (Full): beta={fi_beta:.4f}  SE={fi_se:.4f}")
+    if "Full" in all_results:
+        fi_se   = all_results["Full"]["State clustering (Favara-Imbs)"]["se"]
+        fi_beta = all_results["Full"]["State clustering (Favara-Imbs)"]["beta"]
+        print()
+        print(f"State-cluster SE check (Full): beta={fi_beta:.4f}  SE={fi_se:.4f}")
     print(f"  F&I Table 2 baseline: beta~0.028  SE~0.010")
     print(f"  Note: spec here omits D_CTL and lagged DV -- SE differs from Table 2")
 

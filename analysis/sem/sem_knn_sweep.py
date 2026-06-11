@@ -35,8 +35,9 @@ WBANK_PATH  = ROOT / "data" / "W_bank_avg.npz"
 K_VALUES = list(range(1, 21))
 
 # Reference lambdas from sem_credit.py (will be overwritten from CSV if available)
-LAM_GEO_FULL   = 0.1801
-LAM_GEO_BORDER = 0.1701
+LAM_GEO_FULL      = 0.1801
+LAM_GEO_BORDER    = 0.1701
+LAM_GEO_NONBORDER = 0.1820   # placeholder; overridden at runtime from CSV when available
 
 DV = "Dl_nloans_b"
 
@@ -116,7 +117,8 @@ def run(output_dir=None):
     YEARS    = sorted(panel["year"].unique())
     T        = len(YEARS)
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
-    panel_border = panel[panel["border"] == 1].copy()
+    panel_border    = panel[panel["border"] == 1].copy()
+    panel_nonborder = panel[panel["border"] == 0].copy()
 
     sweep_rows = []
     for k in K_VALUES:
@@ -139,60 +141,79 @@ def run(output_dir=None):
         res_b = run_fe(y_b, x_b, w_knn_b, f"W_bank_k{k}", "Border", YEARS)
         lam_b = float(res_b.lam)
 
+        y_nb, x_nb, w_knn_nb, N_nb = build_arrays(
+            panel_nonborder, county_order, W_knn_all, YEARS, year_pos, "NonBorder")
+        res_nb = run_fe(y_nb, x_nb, w_knn_nb, f"W_bank_k{k}", "NonBorder", YEARS)
+        lam_nb = float(res_nb.lam)
+
         sweep_rows.append(dict(
-            k                  = k,
-            n_links            = nz,
-            possible_links     = tot,
-            density            = density,
-            sparsity           = sparsity,
-            avg_nbrs           = avg_nbrs,
-            lam_geo            = LAM_GEO_FULL,
-            lam_bank_knn       = lam_f,
-            gap                = lam_f  - LAM_GEO_FULL,
-            n_co               = N_f,
-            n_obs              = N_f  * T,
-            lam_geo_border     = LAM_GEO_BORDER,
-            lam_bank_knn_border= lam_b,
-            gap_border         = lam_b - LAM_GEO_BORDER,
-            n_co_border        = N_b,
-            n_obs_border       = N_b * T,
+            k                     = k,
+            n_links               = nz,
+            possible_links        = tot,
+            density               = density,
+            sparsity              = sparsity,
+            avg_nbrs              = avg_nbrs,
+            lam_geo               = LAM_GEO_FULL,
+            lam_bank_knn          = lam_f,
+            gap                   = lam_f  - LAM_GEO_FULL,
+            n_co                  = N_f,
+            n_obs                 = N_f  * T,
+            lam_geo_border        = LAM_GEO_BORDER,
+            lam_bank_knn_border   = lam_b,
+            gap_border            = lam_b - LAM_GEO_BORDER,
+            n_co_border           = N_b,
+            n_obs_border          = N_b * T,
+            lam_geo_nonborder     = LAM_GEO_NONBORDER,
+            lam_bank_knn_nonborder= lam_nb,
+            gap_nonborder         = lam_nb - LAM_GEO_NONBORDER,
+            n_co_nonborder        = N_nb,
+            n_obs_nonborder       = N_nb * T,
         ))
 
     df_sweep = pd.DataFrame(sweep_rows)
 
     # ── Print table ───────────────────────────────────────────────────────────
-    W = 98
+    W = 120
     print()
     print("=" * W)
     print(f"KNN crossover sweep -- DV: {DV}")
-    print(f"Ref lambda: geo_full={LAM_GEO_FULL}  geo_border={LAM_GEO_BORDER}")
+    print(f"Ref lambda: geo_full={LAM_GEO_FULL}  geo_border={LAM_GEO_BORDER}  "
+          f"geo_nonborder={LAM_GEO_NONBORDER}")
     print(f"Gap = lam_knn - lam_geo  |  '<<' marks first k where gap > 0")
     print("=" * W)
-    print(f"{'k':>4}  {'density':>9} {'sparsity':>9} {'avg_nbrs':>8}  "
-          f"{'lam_knn(F)':>11} {'gap(F)':>8}  {'lam_knn(B)':>11} {'gap(B)':>8}")
+    print(f"{'k':>4}  {'density':>9} {'avg_nbrs':>8}  "
+          f"{'lam_knn(F)':>11} {'gap(F)':>8}  "
+          f"{'lam_knn(B)':>11} {'gap(B)':>8}  "
+          f"{'lam_knn(NB)':>12} {'gap(NB)':>9}")
     print("-" * W)
-    cross_f = None
-    cross_b = None
+    cross_f  = None
+    cross_b  = None
+    cross_nb = None
     for row in sweep_rows:
-        tag_f = " <<" if row["gap"]        > 0 and cross_f is None else "   "
-        tag_b = " <<" if row["gap_border"] > 0 and cross_b is None else "   "
-        if row["gap"]        > 0 and cross_f is None: cross_f = row["k"]
-        if row["gap_border"] > 0 and cross_b is None: cross_b = row["k"]
-        print(f"{row['k']:>4}  {row['density']:>9.5f} {row['sparsity']:>9.5f} "
-              f"{row['avg_nbrs']:>8.2f}  {row['lam_bank_knn']:>11.4f} "
-              f"{row['gap']:>+8.4f}{tag_f}  {row['lam_bank_knn_border']:>11.4f} "
-              f"{row['gap_border']:>+8.4f}{tag_b}")
+        tag_f  = " <<" if row["gap"]           > 0 and cross_f  is None else "   "
+        tag_b  = " <<" if row["gap_border"]    > 0 and cross_b  is None else "   "
+        tag_nb = " <<" if row["gap_nonborder"] > 0 and cross_nb is None else "   "
+        if row["gap"]           > 0 and cross_f  is None: cross_f  = row["k"]
+        if row["gap_border"]    > 0 and cross_b  is None: cross_b  = row["k"]
+        if row["gap_nonborder"] > 0 and cross_nb is None: cross_nb = row["k"]
+        print(f"{row['k']:>4}  {row['density']:>9.5f} {row['avg_nbrs']:>8.2f}  "
+              f"{row['lam_bank_knn']:>11.4f} {row['gap']:>+8.4f}{tag_f}  "
+              f"{row['lam_bank_knn_border']:>11.4f} {row['gap_border']:>+8.4f}{tag_b}  "
+              f"{row['lam_bank_knn_nonborder']:>12.4f} {row['gap_nonborder']:>+9.4f}{tag_nb}")
 
     print()
-    cf = cross_f if cross_f is not None else ">20"
-    cb = cross_b if cross_b is not None else ">20"
-    print(f"Crossover k: full={cf}  border={cb}")
+    cf  = cross_f  if cross_f  is not None else ">20"
+    cb  = cross_b  if cross_b  is not None else ">20"
+    cnb = cross_nb if cross_nb is not None else ">20"
+    print(f"Crossover k: full={cf}  border={cb}  nonborder={cnb}")
     print("=" * W)
 
     if output_dir is not None:
         cols = ["k","n_links","possible_links","density","sparsity","avg_nbrs",
                 "lam_geo","lam_bank_knn","gap","n_co","n_obs",
-                "lam_geo_border","lam_bank_knn_border","gap_border","n_co_border","n_obs_border"]
+                "lam_geo_border","lam_bank_knn_border","gap_border","n_co_border","n_obs_border",
+                "lam_geo_nonborder","lam_bank_knn_nonborder","gap_nonborder",
+                "n_co_nonborder","n_obs_nonborder"]
         df_sweep[cols].to_csv(output_dir / "knn_sweep_credit_results.csv", index=False)
         print(f"\nSaved knn_sweep_credit_results.csv to {output_dir}")
 

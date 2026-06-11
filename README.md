@@ -105,11 +105,13 @@ The active pipeline runs, in order:
 
 ## Samples
 
-Two samples are estimated throughout:
+Three samples are estimated throughout:
 
 - **Full**: all counties in the estimation panel (~1,015 counties)
 - **Border**: counties in MSAs that straddle state borders (`border == 1`, 273 counties
   in 43 MSAs), following Favara & Imbs (2015) border-discontinuity identification
+- **NonBorder**: counties NOT in border-straddling MSAs (`border == 0`); serves as a
+  complementary comparison group to the Border sample
 
 ## Main Credit Results
 

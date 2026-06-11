@@ -122,7 +122,8 @@ def _make_plot(csv_rows, output_dir):
     One column per sample (Full, Border), three grouped bars per W variant.
     """
     df = pd.DataFrame(csv_rows)
-    samples = df["sample"].unique()
+    sample_order = ["Full", "Border", "NonBorder"]
+    samples = [s for s in sample_order if s in set(df["sample"])]
     n_sam   = len(samples)
 
     fig, axes = plt.subplots(1, n_sam, figsize=(5 * n_sam + 1, 5), sharey=False)
@@ -134,8 +135,8 @@ def _make_plot(csv_rows, output_dir):
 
     for ax, samp in zip(axes, samples):
         sub = df[(df["sample"] == samp) & (df["w_matrix"].isin(PLOT_WS))].copy()
-        sub = sub.set_index("w_matrix").reindex(
-            [w for w in PLOT_WS if w in sub.index])
+        sub = sub.set_index("w_matrix")
+        sub = sub.reindex([w for w in PLOT_WS if w in sub.index])
         n_w  = len(sub)
         x    = np.arange(n_w)
         bw   = 0.25   # bar width
@@ -146,11 +147,11 @@ def _make_plot(csv_rows, output_dir):
         hi_cols = ["p95_dir",      "p95_int",          "p95_tot"]
 
         for offset, name, col, lo_col, hi_col in zip(offsets, names, cols, lo_cols, hi_cols):
-            vals = sub[col].values
-            lo   = sub[lo_col].values
-            hi   = sub[hi_col].values
-            err_lo = vals - lo
-            err_hi = hi - vals
+            vals = pd.to_numeric(sub[col], errors="coerce").to_numpy(dtype=float)
+            lo   = pd.to_numeric(sub[lo_col], errors="coerce").to_numpy(dtype=float)
+            hi   = pd.to_numeric(sub[hi_col], errors="coerce").to_numpy(dtype=float)
+            err_lo = np.maximum(vals - lo, 0.0)
+            err_hi = np.maximum(hi - vals, 0.0)
             ax.bar(x + offset, vals, width=bw, label=name,
                    color=colors[name], alpha=0.85)
             ax.errorbar(x + offset, vals,

@@ -695,6 +695,11 @@ def load_lambdas(output_dir):
             "bank": get_sem_lam("FE W_bank (border)"),
             "star": get_opt_lam("Pair A", "Border"),
         },
+        "nonborder": {
+            "geo" : get_sem_lam("FE W_geo (nonborder)"),
+            "bank": get_sem_lam("FE W_bank (nonborder)"),
+            "star": get_opt_lam("Pair A", "NonBorder"),
+        },
     }
 
 
@@ -728,11 +733,13 @@ def run(output_dir=None):
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
     YEARS    = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
-    panel_border = panel[panel["border"] == 1].copy()
+    panel_border    = panel[panel["border"] == 1].copy()
+    panel_nonborder = panel[panel["border"] == 0].copy()
 
     sample_specs = [
-        ("Full",   panel,        "full"),
-        ("Border", panel_border, "border"),
+        ("Full",      panel,            "full"),
+        ("Border",    panel_border,     "border"),
+        ("NonBorder", panel_nonborder,  "nonborder"),
     ]
 
     # -- Main estimation loop --------------------------------------------------

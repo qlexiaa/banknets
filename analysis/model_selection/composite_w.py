@@ -133,6 +133,57 @@ def run_alpha_grid(panel_sub, county_order, W_geo_all, W_alt_all, W_alt_label,
     return rows
 
 
+def make_profile_plot(results_df, output_dir):
+    """Plot lambda and relative log-likelihood profiles from saved results."""
+    output_dir = Path(output_dir)
+    pairs = (
+        results_df[["pair", "w_alt"]]
+        .drop_duplicates()
+        .sort_values("pair")
+        .itertuples(index=False, name=None)
+    )
+    pairs = list(pairs)
+    n_pairs = len(pairs)
+    fig, axes = plt.subplots(2, n_pairs, figsize=(4 * n_pairs, 8))
+    if n_pairs == 1:
+        axes = axes.reshape(2, 1)
+
+    styles = [
+        ("Full",      "steelblue", "-"),
+        ("Border",    "firebrick", "--"),
+        ("NonBorder", "darkorange", ":"),
+    ]
+    for col, (pair_label, w_alt_label) in enumerate(pairs):
+        pair_df = results_df[results_df["pair"] == pair_label]
+        for row_idx, (metric, ylabel) in enumerate([
+            ("lam", "lambda"),
+            ("logll", "delta log-likelihood"),
+        ]):
+            ax = axes[row_idx, col]
+            for sample_label, color, ls in styles:
+                sub = pair_df[pair_df["sample"] == sample_label].sort_values("alpha")
+                if sub.empty:
+                    continue
+                x_vals = sub["alpha"].to_numpy(dtype=float)
+                y_vals = sub[metric].to_numpy(dtype=float)
+                if metric == "logll":
+                    y_vals = y_vals - np.nanmax(y_vals)
+                ax.plot(x_vals, y_vals, color=color, ls=ls, lw=2, label=sample_label)
+            ax.set_title(f"W_geo vs {w_alt_label}" if row_idx == 0 else "")
+            ax.set_xlabel("alpha (0 = W_bank, 1 = W_geo)")
+            ax.set_ylabel(ylabel)
+            ax.grid(alpha=0.3)
+            if metric == "logll":
+                ax.axhline(0, color="0.35", linewidth=0.7, alpha=0.7)
+            if col == 0:
+                ax.legend(fontsize=8)
+
+    fig.suptitle("Credit-DV profile likelihood over composite W(alpha)")
+    plt.tight_layout()
+    plt.savefig(output_dir / "composite_w_credit_profiles.png", dpi=150)
+    plt.close()
+
+
 def run(output_dir=None):
     if output_dir is not None:
         output_dir = Path(output_dir)
@@ -241,33 +292,7 @@ def run(output_dir=None):
             output_dir / "composite_w_credit_optima.csv", index=False,
         )
 
-        n_pairs = len(pairs)
-        fig, axes = plt.subplots(2, n_pairs, figsize=(4 * n_pairs, 8))
-        if n_pairs == 1:
-            axes = axes.reshape(2, 1)
-        for col, (pair_label, w_alt_label, _) in enumerate(pairs):
-            for row_idx, (metric, ylabel) in enumerate([
-                ("lam", "lambda"),
-                ("logll", "log-likelihood"),
-            ]):
-                ax = axes[row_idx, col]
-                for sample_label, color, ls in [
-                    ("Full", "steelblue", "-"),
-                    ("Border", "firebrick", "--"),
-                ]:
-                    prows = all_results.get(pair_label, {}).get(sample_label, [])
-                    ax.plot([r["alpha"] for r in prows], [r[metric] for r in prows],
-                            color=color, ls=ls, lw=2, label=sample_label)
-                ax.set_title(f"W_geo vs {w_alt_label}" if row_idx == 0 else "")
-                ax.set_xlabel("alpha (0 = W_bank, 1 = W_geo)")
-                ax.set_ylabel(ylabel)
-                ax.grid(alpha=0.3)
-                if col == 0:
-                    ax.legend(fontsize=8)
-        fig.suptitle("Credit-DV profile likelihood over composite W(alpha)")
-        plt.tight_layout()
-        plt.savefig(output_dir / "composite_w_credit_profiles.png", dpi=150)
-        plt.close()
+        make_profile_plot(pd.DataFrame(all_rows), output_dir)
         print(f"\nSaved credit composite W outputs to {output_dir}")
 
     return {

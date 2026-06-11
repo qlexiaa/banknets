@@ -482,11 +482,19 @@ def print_comparison_table(results_by_sample, sar_df, conley_df_csv):
     """
     z_crit = st.norm.ppf(0.975)
 
+    def sample_mask(series, sample_label):
+        labels = {sample_label}
+        if sample_label == "NonBorder":
+            labels.add("Non-border")
+        elif sample_label == "Non-border":
+            labels.add("NonBorder")
+        return series.isin(labels)
+
     # ── Read ML-SAR results from sar_robustness_credit.csv ─────────────────
     def ml_sar_row(sample_label, w_label):
-        slabel = "Full" if "Full" in sample_label else "Border"
+        slabel = sample_label
         wlabel = w_label
-        row = sar_df[(sar_df["sample"] == slabel) &
+        row = sar_df[sample_mask(sar_df["sample"], slabel) &
                      (sar_df["w_matrix"] == wlabel)]
         if row.empty:
             return None
@@ -502,9 +510,9 @@ def print_comparison_table(results_by_sample, sar_df, conley_df_csv):
 
     # ── Read OLS from conley_se_comparison.csv ─────────────────────────────
     def ols_row_from_conley(sample_label):
-        slabel = "Full" if "Full" in sample_label else "Border"
+        slabel = sample_label
         row = conley_df_csv[
-            (conley_df_csv["sample"] == slabel) &
+            sample_mask(conley_df_csv["sample"], slabel) &
             (conley_df_csv["estimator"] == "State clustering (Favara-Imbs)")
         ]
         if row.empty:
@@ -596,13 +604,21 @@ _EST_MARKERS = {
 def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
     z_crit = st.norm.ppf(0.975)
 
+    def sample_mask(series, sample_label):
+        labels = {sample_label}
+        if sample_label == "NonBorder":
+            labels.add("Non-border")
+        elif sample_label == "Non-border":
+            labels.add("NonBorder")
+        return series.isin(labels)
+
     def _row(sample_label, est_label):
         """Return (beta, lo, hi) or None."""
-        sl = "Full" if "Full" in sample_label else "Border"
+        sl = sample_label
 
         if est_label == "OLS":
             r = conley_df_csv[
-                (conley_df_csv["sample"] == sl) &
+                sample_mask(conley_df_csv["sample"], sl) &
                 (conley_df_csv["estimator"] == "State clustering (Favara-Imbs)")
             ]
             if r.empty:
@@ -612,7 +628,7 @@ def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
 
         if est_label.startswith("ML SAR"):
             wl = est_label.replace("ML SAR ", "")
-            row = sar_df[(sar_df["sample"] == sl) & (sar_df["w_matrix"] == wl)]
+            row = sar_df[sample_mask(sar_df["sample"], sl) & (sar_df["w_matrix"] == wl)]
             if row.empty:
                 return None
             b  = float(row["beta_D"].iloc[0])
@@ -655,9 +671,9 @@ def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
         for i, est in enumerate(_EST_ORDER):
             # direct lookup
             if est == "OLS":
-                sl = "Full" if "Full" in sample_label else "Border"
+                sl = sample_label
                 r = conley_df_csv[
-                    (conley_df_csv["sample"] == sl) &
+                    sample_mask(conley_df_csv["sample"], sl) &
                     (conley_df_csv["estimator"] == "State clustering (Favara-Imbs)")
                 ]
                 if r.empty:
@@ -667,8 +683,8 @@ def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
                 hi = float(r["ci_upper"].iloc[0])
             elif est.startswith("ML SAR"):
                 wl  = est.replace("ML SAR ", "")
-                sl  = "Full" if "Full" in sample_label else "Border"
-                row = sar_df[(sar_df["sample"] == sl) & (sar_df["w_matrix"] == wl)]
+                sl  = sample_label
+                row = sar_df[sample_mask(sar_df["sample"], sl) & (sar_df["w_matrix"] == wl)]
                 if row.empty:
                     continue
                 b  = float(row["beta_D"].iloc[0])
@@ -677,7 +693,7 @@ def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
                 hi = b + z_crit * se
             elif est.startswith("IV-SAR"):
                 wl  = est.replace("IV-SAR ", "")
-                sl  = "Full" if "Full" in sample_label else "Border"
+                sl  = sample_label
                 ivr = ivres.get((sl, wl))
                 if ivr is None:
                     continue
@@ -697,8 +713,7 @@ def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
 
             # Flag weak instruments
             if est.startswith("IV-SAR"):
-                ivr = ivres.get(("Full" if "Full" in sample_label else "Border",
-                                 wl))
+                ivr = ivres.get((sample_label, wl))
                 if ivr and ivr["first_stage_F"] < 10:
                     ax.annotate("!", xy=(xs[i], hi), fontsize=9,
                                 color=color, ha="center", va="bottom")
@@ -764,9 +779,10 @@ def run(output_dir=None):
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
     YEARS    = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
-    panel_border = panel[panel["border"] == 1].copy()
+    panel_border    = panel[panel["border"] == 1].copy()
+    panel_nonborder = panel[panel["border"] == 0].copy()
 
-    samples = [("Full", panel), ("Border", panel_border)]
+    samples = [("Full", panel), ("Border", panel_border), ("NonBorder", panel_nonborder)]
 
     # ── Load existing results for comparison table ────────────────────────────
     sar_df = pd.read_csv(SAR_CSV) if SAR_CSV.exists() else pd.DataFrame()

@@ -64,21 +64,24 @@ def load_panel_with_placebo():
 
 
 def get_samples(panel):
-    """Return [(label, dataframe), ...] for the two estimation samples.
+    """Return [(label, dataframe), ...] for all three estimation samples.
 
-    'Full'   : all urban counties with available data (Favara & Imbs 2015,
-               Table 2 design).
-    'Border' : counties in MSAs traversed by a state border
-               (Favara & Imbs 2015, Appendix Tables A1/A2 design).
-               Identification assumption: local economic conditions vary
-               continuously across the border (Favara & Imbs 2015, p. 971).
-               The border indicator is sourced from the F&I replication data
-               (variable 'border'); the panel contains 273 border-MSA counties
-               across 43 MSAs.
+    'Full'      : all urban counties with available data (Favara & Imbs 2015,
+                  Table 2 design).
+    'Border'    : counties in MSAs traversed by a state border
+                  (Favara & Imbs 2015, Appendix Tables A1/A2 design).
+                  Identification assumption: local economic conditions vary
+                  continuously across the border (Favara & Imbs 2015, p. 971).
+                  The border indicator is sourced from the F&I replication data
+                  (variable 'border'); the panel contains 273 border-MSA counties
+                  across 43 MSAs.
+    'NonBorder' : counties NOT in border-straddling MSAs (border == 0).
+                  Serves as a complementary comparison group to Border.
     """
     return [
-        ("Full",   panel),
-        ("Border", panel[panel["border"] == 1].copy()),
+        ("Full",      panel),
+        ("Border",    panel[panel["border"] == 1].copy()),
+        ("NonBorder", panel[panel["border"] == 0].copy()),
     ]
 
 

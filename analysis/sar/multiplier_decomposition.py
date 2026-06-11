@@ -42,7 +42,6 @@ from w_variants import load_w_geo, load_bank_variants
 ROOT             = Path(__file__).parents[2]
 COUNTY_PATH      = ROOT / "data" / "county_order_Wgeo.csv"
 CREDIT_CSV       = ROOT / "output" / "panel_fe_credit_results.csv"
-HPI_CSV          = ROOT / "output" / "panel_fe_hpi_results.csv"
 CENTROID_CACHE   = ROOT / "data" / "county_centroids.csv"
 
 DECAY_THRESHOLD  = 1e-4    # stop power series when contribution < this
@@ -70,20 +69,17 @@ STATE_NAMES = {
 # ── Data loaders ──────────────────────────────────────────────────────────────
 
 def load_lambdas():
-    """Read full-sample lambda estimates from the two result CSVs."""
+    """Read lambda estimates from panel_fe_credit_results.csv for all samples."""
     lam = {}
+    cr  = pd.read_csv(CREDIT_CSV)
 
-    cr = pd.read_csv(CREDIT_CSV)
-    lam[("credit", "W_geo")]  = float(
-        cr.loc[cr["model"].str.contains("W_geo")  & cr["model"].str.contains("full"), "lam"].iloc[0])
-    lam[("credit", "W_bank")] = float(
-        cr.loc[cr["model"].str.contains("W_bank") & cr["model"].str.contains("full"), "lam"].iloc[0])
-
-    hpi = pd.read_csv(HPI_CSV)
-    lam[("hpi", "W_geo")]  = float(
-        hpi.loc[(hpi["sample"] == "Full") & (hpi["w_matrix"] == "W_geo"),  "lambda"].iloc[0])
-    lam[("hpi", "W_bank")] = float(
-        hpi.loc[(hpi["sample"] == "Full") & (hpi["w_matrix"] == "W_bank"), "lambda"].iloc[0])
+    for sample_tag in ["full", "border", "nonborder"]:
+        for w_tag in ["W_geo", "W_bank"]:
+            mask = (cr["model"].str.contains(w_tag, regex=False) &
+                    cr["model"].str.contains(f"({sample_tag})", regex=False))
+            rows = cr.loc[mask, "lam"]
+            if len(rows) > 0:
+                lam[("credit", w_tag, sample_tag)] = float(rows.iloc[0])
 
     return lam
 
@@ -303,18 +299,24 @@ def run(output_dir=None):
     all_hubs     = []
 
     COMBOS = [
-        ("credit", "W_geo"),
-        ("credit", "W_bank"),
-        ("hpi",    "W_geo"),
-        ("hpi",    "W_bank"),
+        ("credit", "W_geo",  "full"),
+        ("credit", "W_bank", "full"),
+        ("credit", "W_geo",  "border"),
+        ("credit", "W_bank", "border"),
+        ("credit", "W_geo",  "nonborder"),
+        ("credit", "W_bank", "nonborder"),
     ]
 
-    for outcome, w_label in COMBOS:
-        lam    = lam_dict[(outcome, w_label)]
+    for outcome, w_label, sample_tag in COMBOS:
+        key = (outcome, w_label, sample_tag)
+        if key not in lam_dict:
+            print(f"  [SKIP] lambda not found for {key}")
+            continue
+        lam    = lam_dict[key]
         W_sp   = W_MATS[w_label]
 
         print(f"\n{'='*60}")
-        print(f"  {outcome.upper()} | {w_label}  lambda={lam:.6f}")
+        print(f"  {outcome.upper()} | {w_label} | {sample_tag}  lambda={lam:.6f}")
         print(f"{'='*60}")
 
         # Drop zero-row counties (structural islands in this W) before inversion
@@ -366,12 +368,14 @@ def run(output_dir=None):
                             / df_decay["contribution"].sum()) * 100
         print(f"  Decay: {n_terms} terms to threshold {DECAY_THRESHOLD:.0e}. "
               f"First 5 orders capture {cumul_at_5:.1f}% of indirect transmission.")
+        df_decay.insert(0, "sample",   sample_tag)
         df_decay.insert(0, "w_matrix", w_label)
         df_decay.insert(0, "outcome",  outcome)
         all_decay.append(df_decay)
 
         # ── 4. Hub counties ───────────────────────────────────────────────────
         df_hubs = hub_counties(S, co_sub)
+        df_hubs.insert(0, "sample",   sample_tag)
         df_hubs.insert(0, "w_matrix", w_label)
         df_hubs.insert(0, "outcome",  outcome)
         all_hubs.append(df_hubs)
@@ -386,6 +390,7 @@ def run(output_dir=None):
         summary_rows.append({
             "outcome":         outcome,
             "w_matrix":        w_label,
+            "sample":          sample_tag,
             "lambda":          lam,
             "total_multiplier": avg_total,
             "avg_direct":      avg_direct,
@@ -403,14 +408,14 @@ def run(output_dir=None):
     print("SPATIAL MULTIPLIER DECOMPOSITION SUMMARY")
     print("S = (I - lambda*W)^{-1}   |   NOTE: SEM error-process co-movement, not causal SAR")
     print("=" * W_TBL)
-    hdr = (f"{'Outcome':<10} {'W':<12} {'lambda':>8} {'Total mult':>11} "
+    hdr = (f"{'Outcome':<10} {'W':<12} {'Sample':<12} {'lambda':>8} {'Total mult':>11} "
            f"{'Avg direct':>11} {'Avg indir':>10} {'Indir %':>8} "
            f"{f'Avg reach ({reach_label})':>18}")
     print(hdr)
     print("-" * W_TBL)
     for r in summary_rows:
         reach_key = f"avg_reach_{reach_label}"
-        print(f"{r['outcome']:<10} {r['w_matrix']:<12} {r['lambda']:>8.4f} "
+        print(f"{r['outcome']:<10} {r['w_matrix']:<12} {r['sample']:<12} {r['lambda']:>8.4f} "
               f"{r['total_multiplier']:>11.4f} {r['avg_direct']:>11.4f} "
               f"{r['avg_indirect']:>10.4f} {r['indirect_share_pct']:>7.2f}% "
               f"{r.get(reach_key, float('nan')):>18.1f}")
@@ -428,7 +433,7 @@ def run(output_dir=None):
         print(f"\nSaved spatial_multiplier_decomposition.csv")
 
         # Decay series
-        decay_cols = ["outcome", "w_matrix", "order_k", "contribution", "cumulative_share"]
+        decay_cols = ["outcome", "w_matrix", "sample", "order_k", "contribution", "cumulative_share"]
         pd.concat(all_decay, ignore_index=True)[decay_cols].to_csv(
             output_dir / "spatial_multiplier_decay.csv", index=False)
         print("Saved spatial_multiplier_decay.csv")
