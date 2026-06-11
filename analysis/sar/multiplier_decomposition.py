@@ -351,6 +351,9 @@ def run(output_dir=None):
         W_sp_sub, co_sub = drop_zero_rows(W_sp_samp, co_samp)
         N_sub   = len(co_sub)
         W_dense = W_sp_sub.toarray().astype(np.float64)
+        row_sums = W_dense.sum(axis=1, keepdims=True)
+        nonzero_rows = row_sums[:, 0] > 0
+        W_dense[nonzero_rows] /= row_sums[nonzero_rows]
 
         # ── 1. Inverse ────────────────────────────────────────────────────────
         print(f"  Computing (I - lambda*W)^{{-1}} on {N_sub}x{N_sub} matrix ...")
@@ -359,7 +362,7 @@ def run(output_dir=None):
         S_off             = S.copy(); np.fill_diagonal(S_off, 0.0)
 
         avg_direct   = float(diag_S.mean())
-        avg_total    = float(analytic_total)
+        avg_total    = float(S.sum(axis=1).mean())
         avg_indirect = avg_total - avg_direct
         indir_share  = avg_indirect / avg_total * 100.0
 
