@@ -41,7 +41,7 @@ import scipy.stats as st
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa
-from utils import row_standardize, sparse_to_pysal_w
+from utils import row_standardize, sparse_to_pysal_w, two_way_within, build_wbank_knn
 from panel_data import load_panel_with_credit
 from w_variants import load_w_geo, load_bank_variants
 
@@ -58,25 +58,6 @@ SAR_CSV     = ROOT / "output" / "sar_robustness_credit.csv"
 CONLEY_CSV  = ROOT / "output" / "conley_se_comparison.csv"
 DV          = "Dl_nloans_b"
 MORAN_PERMS = 999
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Within transformation (identical to conley_se_comparison.py)
-# ══════════════════════════════════════════════════════════════════════════════
-
-def two_way_within(arr_TN):
-    """
-    Two-way (county + year) within transformation for a (T, N) array.
-
-    arr - county_mean[None,:] - year_mean[:,None] + grand_mean
-    Equivalent step-form: county-demean → add grand mean → year-demean.
-    """
-    county_mean = arr_TN.mean(axis=0)
-    grand_mean  = float(arr_TN.mean())
-    z = arr_TN - county_mean[None, :]
-    z = z + grand_mean
-    z = z - z.mean(axis=1, keepdims=True)
-    return z
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -504,13 +485,7 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
                  if moran_rows else float("nan")
 
     if verbose and moran_rows:
-        for r in moran_rows:
-            sig = ("***" if r["p_value"] < 0.01
-                   else "**" if r["p_value"] < 0.05
-                   else "*"  if r["p_value"] < 0.10 else "")
-            print(f"    {r['year']}  I={r['moran_I']:+.4f}  "
-                  f"z={r['z_score']:+.2f}  p={r['p_value']:.3f}  {sig}")
-        print(f"  Mean Moran I (W_bank): {moran_mean:.4f}")
+        _log_moran_rows(moran_rows, moran_mean)
 
     z_crit = st.norm.ppf(0.975)
     return dict(
@@ -668,17 +643,11 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
 
     xi_TN      = xi_f.reshape(T, N)
     moran_rows = moran_i_sar_resid(xi_TN, s["W_bank_sub"], s["YEARS"])
-    moran_mean = (float(np.mean([r["moran_I"] for r in moran_rows]))
-                  if moran_rows else float("nan"))
+    moran_mean = float(np.mean([r["moran_I"] for r in moran_rows])) \
+                 if moran_rows else float("nan")
 
     if verbose and moran_rows:
-        for r in moran_rows:
-            sig = ("***" if r["p_value"] < 0.01
-                   else "**" if r["p_value"] < 0.05
-                   else "*"  if r["p_value"] < 0.10 else "")
-            print(f"    {r['year']}  I={r['moran_I']:+.4f}  "
-                  f"z={r['z_score']:+.2f}  p={r['p_value']:.3f}  {sig}")
-        print(f"  Mean Moran I (W_bank): {moran_mean:.4f}")
+        _log_moran_rows(moran_rows, moran_mean)
 
     z_crit = st.norm.ppf(0.975)
     return dict(
@@ -720,6 +689,58 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Shared helpers
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _sample_mask(series, sample_label):
+    """Match a sample label, handling NonBorder / Non-border aliases."""
+    labels = {sample_label}
+    if sample_label == "NonBorder":
+        labels.add("Non-border")
+    elif sample_label == "Non-border":
+        labels.add("NonBorder")
+    return series.isin(labels)
+
+
+def _result_to_csv_row(r):
+    """Extract the CSV columns from a result dict (works for KP-2SLS and SDM-IV)."""
+    return dict(
+        sample                = r["sample"],
+        W                     = r["W"],
+        spec                  = r["spec"],
+        rho                   = r["rho"],
+        rho_se                = r["rho_se"],
+        rho_ci_lower          = r["rho_ci_lower"],
+        rho_ci_upper          = r["rho_ci_upper"],
+        beta                  = r["beta"],
+        beta_se               = r["beta_se"],
+        beta_ci_lower         = r["beta_ci_lower"],
+        beta_ci_upper         = r["beta_ci_upper"],
+        theta_WD              = r["theta_WD"],
+        theta_WD_se           = r["theta_WD_se"],
+        first_stage_F         = r["first_stage_F"],
+        first_stage_F_cluster = r["first_stage_F_cluster"],
+        corr_q1q2             = r["corr_q1q2"],
+        corr_q2q3             = r["corr_q2q3"],
+        cond_num_instr        = r["cond_num_instr"],
+        residual_moran_i_mean = r["residual_moran_i_mean"],
+        N_counties            = r["N_counties"],
+        N_obs                 = r["N_obs"],
+    )
+
+
+def _log_moran_rows(moran_rows, moran_mean):
+    """Print per-year Moran's I results and mean."""
+    for r in moran_rows:
+        sig = ("***" if r["p_value"] < 0.01
+               else "**" if r["p_value"] < 0.05
+               else "*"  if r["p_value"] < 0.10 else "")
+        print(f"    {r['year']}  I={r['moran_I']:+.4f}  "
+              f"z={r['z_score']:+.2f}  p={r['p_value']:.3f}  {sig}")
+    print(f"  Mean Moran I (W_bank): {moran_mean:.4f}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Comparison table
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -729,20 +750,10 @@ def print_comparison_table(results_by_sample, sar_df, conley_df_csv):
     """
     z_crit = st.norm.ppf(0.975)
 
-    def sample_mask(series, sample_label):
-        labels = {sample_label}
-        if sample_label == "NonBorder":
-            labels.add("Non-border")
-        elif sample_label == "Non-border":
-            labels.add("NonBorder")
-        return series.isin(labels)
-
     # ── Read ML-SAR results from sar_robustness_credit.csv ─────────────────
     def ml_sar_row(sample_label, w_label):
-        slabel = sample_label
-        wlabel = w_label
-        row = sar_df[sample_mask(sar_df["sample"], slabel) &
-                     (sar_df["w_matrix"] == wlabel)]
+        row = sar_df[_sample_mask(sar_df["sample"], sample_label) &
+                     (sar_df["w_matrix"] == w_label)]
         if row.empty:
             return None
         r     = row.iloc[0]
@@ -757,9 +768,8 @@ def print_comparison_table(results_by_sample, sar_df, conley_df_csv):
 
     # ── Read OLS from conley_se_comparison.csv ─────────────────────────────
     def ols_row_from_conley(sample_label):
-        slabel = sample_label
         row = conley_df_csv[
-            sample_mask(conley_df_csv["sample"], slabel) &
+            _sample_mask(conley_df_csv["sample"], sample_label) &
             (conley_df_csv["estimator"] == "State clustering (Favara-Imbs)")
         ]
         if row.empty:
@@ -850,56 +860,6 @@ _EST_MARKERS = {
 
 def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
     z_crit = st.norm.ppf(0.975)
-
-    def sample_mask(series, sample_label):
-        labels = {sample_label}
-        if sample_label == "NonBorder":
-            labels.add("Non-border")
-        elif sample_label == "Non-border":
-            labels.add("NonBorder")
-        return series.isin(labels)
-
-    def _row(sample_label, est_label):
-        """Return (beta, lo, hi) or None."""
-        sl = sample_label
-
-        if est_label == "OLS":
-            r = conley_df_csv[
-                sample_mask(conley_df_csv["sample"], sl) &
-                (conley_df_csv["estimator"] == "State clustering (Favara-Imbs)")
-            ]
-            if r.empty:
-                return None
-            b, lo, hi = float(r["beta"].iloc[0]), float(r["ci_lower"].iloc[0]), float(r["ci_upper"].iloc[0])
-            return b, lo, hi
-
-        if est_label.startswith("ML SAR"):
-            wl = est_label.replace("ML SAR ", "")
-            row = sar_df[sample_mask(sar_df["sample"], sl) & (sar_df["w_matrix"] == wl)]
-            if row.empty:
-                return None
-            b  = float(row["beta_D"].iloc[0])
-            se = float(row["beta_D_se"].iloc[0])
-            return b, b - z_crit * se, b + z_crit * se
-
-        if est_label.startswith("IV-SAR"):
-            wl  = est_label.replace("IV-SAR ", "")
-            key = (sl + (" sample" if "Non" in sl else " sample"), wl)
-            # handle both key formats
-            for k, v in results_by_sample.items():
-                ivr = v.get((k, wl)) or v.get((sl, wl))
-                if ivr is None:
-                    # try all keys
-                    for kk, vv in v.items():
-                        if kk[1] == wl and sl in kk[0]:
-                            ivr = vv
-                            break
-                if ivr:
-                    return ivr["beta"], ivr["beta_ci_lower"], ivr["beta_ci_upper"]
-            return None
-
-        return None
-
     sample_labels = list(results_by_sample.keys())
     fig, axes = plt.subplots(1, len(sample_labels), figsize=(12, 5), sharey=True)
     if len(sample_labels) == 1:
@@ -910,17 +870,18 @@ def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
         ivres = results_by_sample[sample_label]
 
         # OLS reference line
-        ols_r = _row(sample_label, "OLS")
-        if ols_r:
-            ax.axhline(ols_r[0], color=_EST_COLORS["OLS"],
+        _ols_ref = conley_df_csv[
+            _sample_mask(conley_df_csv["sample"], sample_label) &
+            (conley_df_csv["estimator"] == "State clustering (Favara-Imbs)")
+        ]
+        if not _ols_ref.empty:
+            ax.axhline(float(_ols_ref["beta"].iloc[0]), color=_EST_COLORS["OLS"],
                        linewidth=1.0, linestyle="--", alpha=0.5, zorder=1)
 
         for i, est in enumerate(_EST_ORDER):
-            # direct lookup
             if est == "OLS":
-                sl = sample_label
                 r = conley_df_csv[
-                    sample_mask(conley_df_csv["sample"], sl) &
+                    _sample_mask(conley_df_csv["sample"], sample_label) &
                     (conley_df_csv["estimator"] == "State clustering (Favara-Imbs)")
                 ]
                 if r.empty:
@@ -930,8 +891,10 @@ def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
                 hi = float(r["ci_upper"].iloc[0])
             elif est.startswith("ML SAR"):
                 wl  = est.replace("ML SAR ", "")
-                sl  = sample_label
-                row = sar_df[sample_mask(sar_df["sample"], sl) & (sar_df["w_matrix"] == wl)]
+                row = sar_df[
+                    _sample_mask(sar_df["sample"], sample_label) &
+                    (sar_df["w_matrix"] == wl)
+                ]
                 if row.empty:
                     continue
                 b  = float(row["beta_D"].iloc[0])
@@ -940,8 +903,7 @@ def make_comparison_plot(results_by_sample, sar_df, conley_df_csv, out_path):
                 hi = b + z_crit * se
             elif est.startswith("IV-SAR"):
                 wl  = est.replace("IV-SAR ", "")
-                sl  = sample_label
-                ivr = ivres.get((sl, wl))
+                ivr = ivres.get((sample_label, wl))
                 if ivr is None:
                     continue
                 b  = ivr["beta"]
@@ -1057,57 +1019,12 @@ def run(output_dir=None):
             # ── KP-2SLS ─────────────────────────────────────────────────────
             r = run_iv_sar(s, W_label, sample_label, verbose=True)
             all_iv_results[sample_label][(sample_label, W_label)] = r
-
-            csv_rows.append(dict(
-                sample                = r["sample"],
-                W                     = r["W"],
-                spec                  = r["spec"],
-                rho                   = r["rho"],
-                rho_se                = r["rho_se"],
-                rho_ci_lower          = r["rho_ci_lower"],
-                rho_ci_upper          = r["rho_ci_upper"],
-                beta                  = r["beta"],
-                beta_se               = r["beta_se"],
-                beta_ci_lower         = r["beta_ci_lower"],
-                beta_ci_upper         = r["beta_ci_upper"],
-                theta_WD              = r["theta_WD"],
-                theta_WD_se           = r["theta_WD_se"],
-                first_stage_F         = r["first_stage_F"],
-                first_stage_F_cluster = r["first_stage_F_cluster"],
-                corr_q1q2             = r["corr_q1q2"],
-                corr_q2q3             = r["corr_q2q3"],
-                cond_num_instr        = r["cond_num_instr"],
-                residual_moran_i_mean = r["residual_moran_i_mean"],
-                N_counties            = r["N_counties"],
-                N_obs                 = r["N_obs"],
-            ))
+            csv_rows.append(_result_to_csv_row(r))
 
             # ── SDM-IV ──────────────────────────────────────────────────────
             try:
                 r_sdm = run_sdm_iv(s, W_label, sample_label, verbose=True)
-                csv_rows.append(dict(
-                    sample                = r_sdm["sample"],
-                    W                     = r_sdm["W"],
-                    spec                  = r_sdm["spec"],
-                    rho                   = r_sdm["rho"],
-                    rho_se                = r_sdm["rho_se"],
-                    rho_ci_lower          = r_sdm["rho_ci_lower"],
-                    rho_ci_upper          = r_sdm["rho_ci_upper"],
-                    beta                  = r_sdm["beta"],
-                    beta_se               = r_sdm["beta_se"],
-                    beta_ci_lower         = r_sdm["beta_ci_lower"],
-                    beta_ci_upper         = r_sdm["beta_ci_upper"],
-                    theta_WD              = r_sdm["theta_WD"],
-                    theta_WD_se           = r_sdm["theta_WD_se"],
-                    first_stage_F         = r_sdm["first_stage_F"],
-                    first_stage_F_cluster = r_sdm["first_stage_F_cluster"],
-                    corr_q1q2             = r_sdm["corr_q1q2"],
-                    corr_q2q3             = r_sdm["corr_q2q3"],
-                    cond_num_instr        = r_sdm["cond_num_instr"],
-                    residual_moran_i_mean = r_sdm["residual_moran_i_mean"],
-                    N_counties            = r_sdm["N_counties"],
-                    N_obs                 = r_sdm["N_obs"],
-                ))
+                csv_rows.append(_result_to_csv_row(r_sdm))
             except Exception as exc:
                 print(f"  [WARN] SDM-IV {sample_label} {W_label} failed: {exc}")
 

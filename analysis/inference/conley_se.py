@@ -56,7 +56,7 @@ import scipy.stats as st
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa: applies spreg patch
-from utils import row_standardize
+from utils import row_standardize, two_way_within
 from panel_data import load_panel_with_credit
 from w_variants import load_w_geo, load_bank_variants
 
@@ -70,30 +70,6 @@ ESTIMATOR_LABELS = [
     "Spatial HAC W_bank",
     "State + Spatial HAC W_bank",
 ]
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Within transformation
-# ══════════════════════════════════════════════════════════════════════════════
-
-def two_way_within(arr_TN):
-    """
-    Two-way (county + year) within transformation for a (T, N) panel array.
-
-    Steps (equivalent to arr - county_mean - year_mean + grand_mean):
-      1. Demean by county mean (mean over T): z = arr - arr.mean(axis=0)
-      2. Add grand mean back:                 z = z  + arr.mean()
-      3. Demean by year mean (mean over N):   z = z  - z.mean(axis=1, keepdims=True)
-
-    The result satisfies: z_it = arr_it - arr_bar_i - arr_bar_t + arr_bar
-    which is the standard two-way FE within estimator.
-    """
-    county_mean = arr_TN.mean(axis=0)             # (N,) -- mean over time
-    grand_mean  = float(arr_TN.mean())             # scalar
-    z = arr_TN - county_mean[None, :]             # step 1: subtract county mean
-    z = z + grand_mean                            # step 2: restore grand mean
-    year_mean = z.mean(axis=1, keepdims=True)     # (T,1) -- mean over counties
-    return z - year_mean                          # step 3: subtract year mean
 
 
 def ols_scalar(y_flat, x_flat):

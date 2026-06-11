@@ -26,7 +26,7 @@ from esda.moran import Moran
 from libpysal.weights import WSP
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from utils import gal_to_W, row_standardize  # noqa: E402
+from utils import gal_to_W, row_standardize, build_wbank_knn  # noqa: E402
 
 
 ROOT = Path(__file__).parents[2]
@@ -42,27 +42,6 @@ WBANK_NONGEO_PATH = ROOT / "data" / "W_bank_nonGeo.npz"
 
 K_VALUES = list(range(1, 21))
 PERMUTATIONS = 999
-
-
-def build_wbank_knn(W_sparse, k):
-    """Keep each row's top-k positive weights and row-standardize."""
-    W = W_sparse.toarray().astype(np.float64)
-    np.fill_diagonal(W, 0.0)
-
-    W_knn = np.zeros_like(W)
-    for i in range(W.shape[0]):
-        row = W[i]
-        nz = np.count_nonzero(row)
-        if nz == 0:
-            continue
-        if nz <= k:
-            W_knn[i] = row
-        else:
-            top_k = np.argpartition(row, -k)[-k:]
-            W_knn[i, top_k] = row[top_k]
-
-    np.fill_diagonal(W_knn, 0.0)
-    return row_standardize(scipy.sparse.csr_matrix(W_knn))
 
 
 def matrix_stats(W_sparse):

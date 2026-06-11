@@ -60,7 +60,7 @@ from scipy.sparse.linalg import eigs as sp_eigs
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa: applies spreg patch
-from utils import row_standardize, sparse_to_pysal_w
+from utils import row_standardize, sparse_to_pysal_w, two_way_within
 from panel_data import load_panel_with_credit
 from w_variants import load_w_geo, load_bank_variants
 
@@ -81,26 +81,6 @@ _COLORS = {
     "FGLS W_bank":            "#d01c8b",
     "FGLS W* (composite)":    "#e66101",
 }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Within transformation (two-way FE demeaning)
-# ══════════════════════════════════════════════════════════════════════════════
-
-def two_way_within(arr_TN):
-    """
-    Two-way (county + year) within transformation for a (T, N) panel array.
-
-    Computes arr_it - arr_bar_i - arr_bar_t + arr_bar using three passes:
-      1. Subtract county mean (over T)
-      2. Add grand mean back
-      3. Subtract year mean (over N after step 2)
-    """
-    county_mean = arr_TN.mean(axis=0)           # (N,) mean over time
-    grand_mean  = float(arr_TN.mean())           # scalar
-    z = arr_TN - county_mean[None, :]
-    z = z + grand_mean
-    return z - z.mean(axis=1, keepdims=True)     # (T, N)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

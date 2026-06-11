@@ -138,3 +138,51 @@ def gal_to_W(path, county_order=None):
 def sparse_to_pysal_w(W_sparse):
     """Convert a row-standardised sparse CSR to a libpysal W object."""
     return WSP(W_sparse.tocsr()).to_W()
+
+
+def two_way_within(arr_TN):
+    """
+    Two-way (county + year) within transformation for a (T, N) panel array.
+
+    Computes arr_it - arr_bar_i - arr_bar_t + arr_bar using three passes:
+      1. Subtract county mean (over T)
+      2. Add grand mean back
+      3. Subtract year mean (over N after step 2)
+    """
+    county_mean = arr_TN.mean(axis=0)
+    grand_mean  = float(arr_TN.mean())
+    z = arr_TN - county_mean[None, :]
+    z = z + grand_mean
+    return z - z.mean(axis=1, keepdims=True)
+
+
+def build_wbank_knn(W_sparse, k):
+    """
+    Keep each row's top-k positive weights and row-standardize.
+
+    Parameters
+    ----------
+    W_sparse : scipy sparse matrix
+        Source weight matrix (off-diagonal weights, zero diagonal expected).
+    k : int
+        Number of nearest neighbours to retain per row.
+
+    Returns
+    -------
+    scipy.sparse.csr_matrix  row-standardised KNN weight matrix
+    """
+    W = W_sparse.toarray().astype(np.float64)
+    np.fill_diagonal(W, 0.0)
+    W_knn = np.zeros_like(W)
+    for i in range(W.shape[0]):
+        row = W[i]
+        nz  = np.count_nonzero(row)
+        if nz == 0:
+            continue
+        if nz <= k:
+            W_knn[i] = row
+        else:
+            top_k = np.argpartition(row, -k)[-k:]
+            W_knn[i, top_k] = row[top_k]
+    np.fill_diagonal(W_knn, 0.0)
+    return row_standardize(scipy.sparse.csr_matrix(W_knn))

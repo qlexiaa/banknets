@@ -25,7 +25,7 @@ import spreg
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa
-from utils import row_standardize, sparse_to_pysal_w
+from utils import row_standardize, sparse_to_pysal_w, build_wbank_knn
 from panel_data import load_panel_with_credit
 
 ROOT        = Path(__file__).parents[2]
@@ -40,29 +40,6 @@ LAM_GEO_CONTIG    = 0.1701
 LAM_GEO_NONCONTIG = 0.1820   # placeholder; overridden at runtime from CSV when available
 
 DV = "Dl_nloans_b"
-
-
-def build_wbank_knn(W_sparse, k):
-    """Keep top-k weights per row, re-standardise. Returns scipy CSR."""
-    W = W_sparse.toarray().astype(np.float64)
-    np.fill_diagonal(W, 0.0)
-    N = W.shape[0]
-    W_knn = np.zeros_like(W)
-    for i in range(N):
-        row = W[i]
-        nz  = np.count_nonzero(row)
-        if nz == 0:
-            continue
-        if nz <= k:
-            W_knn[i] = row
-        else:
-            top_k = np.argpartition(row, -k)[-k:]
-            W_knn[i, top_k] = row[top_k]
-    np.fill_diagonal(W_knn, 0.0)
-    rs = W_knn.sum(axis=1, keepdims=True)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        W_knn = np.where(rs > 0, W_knn / rs, 0.0)
-    return scipy.sparse.csr_matrix(W_knn)
 
 
 def build_arrays(panel_sub, county_order, W_knn_all, YEARS, year_pos, sample_label):

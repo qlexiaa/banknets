@@ -31,7 +31,7 @@ import pandas as pd
 import scipy.sparse
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from utils import row_standardize
+from utils import row_standardize, build_wbank_knn
 from w_variants import load_w_geo, load_bank_variants
 
 ROOT        = Path(__file__).parents[2]
@@ -64,28 +64,6 @@ def _row_stats(W_sp, label):
         "pct_isolated":  100.0 * (nbrs_per_row == 0).sum() / N,
     }
 
-
-def _build_knn(W_sp, k):
-    """Keep top-k weights per row, row-standardise. Returns scipy CSR."""
-    W = W_sp.toarray().astype(np.float64)
-    np.fill_diagonal(W, 0.0)
-    N = W.shape[0]
-    W_knn = np.zeros_like(W)
-    for i in range(N):
-        row = W[i]
-        nz  = np.count_nonzero(row)
-        if nz == 0:
-            continue
-        if nz <= k:
-            W_knn[i] = row
-        else:
-            top_k = np.argpartition(row, -k)[-k:]
-            W_knn[i, top_k] = row[top_k]
-    np.fill_diagonal(W_knn, 0.0)
-    rs = W_knn.sum(axis=1, keepdims=True)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        W_knn = np.where(rs > 0, W_knn / rs, 0.0)
-    return scipy.sparse.csr_matrix(W_knn)
 
 
 def run(output_dir=None):
@@ -121,7 +99,7 @@ def run(output_dir=None):
     # KNN variants at selected k values
     W_bank_raw = bank_vars["W_bank"]
     for k in KNN_SELECTED:
-        W_knn = _build_knn(W_bank_raw, k)
+        W_knn = build_wbank_knn(W_bank_raw, k)
         label = f"W_bank_knn{k}"
         rows.append(_row_stats(W_knn, label))
         print(f"  {label:<24}: density={rows[-1]['density_pct']:.4f}%  "
