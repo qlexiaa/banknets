@@ -1,9 +1,8 @@
 """
 sem_credit.py -- Panel_FE_Error with credit growth as the DV
 =================================================================
-Parallel to panel_fe_error.py but uses Dl_nloans_b (Δln number of
-commercial-bank mortgage loans, from Favara & Imbs HMDA data) as the
-dependent variable instead of HPI.
+Uses Dl_nloans_b (dln number of commercial-bank mortgage loans, from
+Favara & Imbs HMDA data) as the dependent variable.
 
 Structural equation:
   Dl_nloans_b_it = β * Linter_bra_it + county FE + year FE + spatial error
@@ -21,8 +20,7 @@ and left-merged into the estimation panel on [fips5, year].
 NaN policy: Panel_FE_Error requires a balanced panel with no NaN in y.
   - No panel county is all-NaN for Dl_nloans_b (all 1023 appear in hmda).
   - 67 counties have 1-3 missing years (partial NaN).
-  - These are dropped via an any-NaN filter (stricter than panel_fe_error.py's
-    all-NaN filter for Linter_ela) to guarantee a clean balanced panel.
+  - These are dropped via an any-NaN filter to guarantee a clean balanced panel.
 
 Outputs
 -------

@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pyreadstat
+import scipy.sparse
 
 from utils import row_standardize, sparse_to_pysal_w
 
@@ -68,21 +69,90 @@ def get_samples(panel):
 
     'Full'      : all urban counties with available data (Favara & Imbs 2015,
                   Table 2 design).
-    'Border'    : counties in MSAs traversed by a state border
-                  (Favara & Imbs 2015, Appendix Tables A1/A2 design).
+    'Contig'    : counties in MSAs traversed by a state border (border == 1).
+                  Favara & Imbs (2015) Appendix Tables A1/A2 design.
                   Identification assumption: local economic conditions vary
                   continuously across the border (Favara & Imbs 2015, p. 971).
-                  The border indicator is sourced from the F&I replication data
-                  (variable 'border'); the panel contains 273 border-MSA counties
-                  across 43 MSAs.
-    'NonBorder' : counties NOT in border-straddling MSAs (border == 0).
-                  Serves as a complementary comparison group to Border.
+                  The panel contains 273 contiguous-MSA counties across 43 MSAs.
+    'NonContig' : counties NOT in border-straddling MSAs (border == 0).
+                  Complementary comparison group to Contig.
     """
     return [
         ("Full",      panel),
-        ("Border",    panel[panel["border"] == 1].copy()),
-        ("NonBorder", panel[panel["border"] == 0].copy()),
+        ("Contig",    panel[panel["border"] == 1].copy()),
+        ("NonContig", panel[panel["border"] == 0].copy()),
     ]
+
+
+def get_common_sample(panel, county_order, W_geo_all, W_bank_all, dv="Dl_nloans_b"):
+    """Return the set of counties usable under BOTH W_geo and W_bank.
+
+    A county is excluded if it:
+      (a) has any missing year in `dv` (balanced-panel requirement), OR
+      (b) is a structural island (zero row-sum) under W_geo, OR
+      (c) is a structural island (zero row-sum) under W_bank.
+
+    Variant-specific islands (e.g. W_bank_nonGeo may isolate extra counties)
+    can still drop within that variant; this function only establishes the
+    baseline common estimation set for comparability of log-likelihoods and
+    gap z-tests across W specifications.
+
+    Parameters
+    ----------
+    panel        : DataFrame with columns fips5, dv, border
+    county_order : list of fips5 strings (master ordering from W_geo GAL file)
+    W_geo_all    : (N_all, N_all) scipy sparse W_geo matrix aligned to county_order
+    W_bank_all   : (N_all, N_all) scipy sparse W_bank matrix aligned to county_order
+
+    Returns
+    -------
+    usable : list of fips5 strings in county_order order, safe under both W
+    """
+    expected_shape = (len(county_order), len(county_order))
+    for name, W in (("W_geo_all", W_geo_all), ("W_bank_all", W_bank_all)):
+        if not isinstance(W, scipy.sparse.spmatrix):
+            raise ValueError(
+                f"{name} must be a scipy.sparse matrix with expected shape "
+                f"{expected_shape}; got {type(W).__name__}."
+            )
+        if W.shape[0] != W.shape[1]:
+            raise ValueError(
+                f"{name} must be square with expected shape {expected_shape}; "
+                f"got shape {W.shape}."
+            )
+
+    if W_geo_all.shape != W_bank_all.shape:
+        raise ValueError(
+            "W_geo_all and W_bank_all must have identical shapes with "
+            f"expected shape {expected_shape}; got W_geo_all shape "
+            f"{W_geo_all.shape} and W_bank_all shape {W_bank_all.shape}."
+        )
+    if W_geo_all.shape[0] != len(county_order):
+        raise ValueError(
+            "W_geo_all and W_bank_all must align to county_order with "
+            f"expected shape {expected_shape}; got W_geo_all shape "
+            f"{W_geo_all.shape}, W_bank_all shape {W_bank_all.shape}, and "
+            f"len(county_order)={len(county_order)}."
+        )
+
+    # (a) counties with any missing dv
+    any_nan = panel.groupby("fips5")[dv].apply(lambda s: s.isna().any())
+    sub_co  = set(panel["fips5"].unique())
+
+    # (b) island detection in full matrices
+    rs_geo  = np.array(W_geo_all.sum(axis=1)).flatten()
+    rs_bank = np.array(W_bank_all.sum(axis=1)).flatten()
+    island_geo  = {county_order[i] for i, r in enumerate(rs_geo)  if r == 0}
+    island_bank = {county_order[i] for i, r in enumerate(rs_bank) if r == 0}
+    islands = island_geo | island_bank
+
+    usable = [
+        c for c in county_order
+        if c in sub_co
+        and not any_nan.get(c, True)
+        and c not in islands
+    ]
+    return usable
 
 
 def build_arrays(panel, county_order, W_geo_all, W_bank_all,

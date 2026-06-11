@@ -150,8 +150,8 @@ def make_profile_plot(results_df, output_dir):
 
     styles = [
         ("Full",      "steelblue", "-"),
-        ("Border",    "firebrick", "--"),
-        ("NonBorder", "darkorange", ":"),
+        ("Contig",    "firebrick", "--"),
+        ("NonContig", "darkorange", ":"),
     ]
     for col, (pair_label, w_alt_label) in enumerate(pairs):
         pair_df = results_df[results_df["pair"] == pair_label]
@@ -237,11 +237,22 @@ def run(output_dir=None):
             if not rows:
                 continue
             best = max(rows, key=lambda r: r["logll"])
-            geo_r = next((r for r in rows if np.isclose(r["alpha"], 1.0)), None)
+            geo_r  = next((r for r in rows if np.isclose(r["alpha"], 1.0)), None)
             bank_r = next((r for r in rows if np.isclose(r["alpha"], 0.0)), None)
-            ll_geo = geo_r["logll"] if geo_r else np.nan
-            ll_bank = bank_r["logll"] if bank_r else np.nan
-            baseline = np.nanmax([ll_geo, ll_bank])
+            ll_geo  = float(geo_r["logll"])  if geo_r  else np.nan
+            ll_bank = float(bank_r["logll"]) if bank_r else np.nan
+            # Robustly compute improvement: if alpha*=0 best is at bank endpoint,
+            # improvement = 0 by definition; likewise for alpha*=1.
+            # Use nanmax so a missing endpoint gives improvement vs. the other.
+            finite_endpoints = [v for v in [ll_geo, ll_bank] if np.isfinite(v)]
+            if finite_endpoints:
+                baseline = max(finite_endpoints)
+                improvement = float(best["logll"]) - baseline
+                # Clamp tiny float noise at endpoints to exactly 0.0
+                if np.isclose(best["alpha"], 0.0) or np.isclose(best["alpha"], 1.0):
+                    improvement = max(improvement, 0.0)
+            else:
+                improvement = np.nan
             optima_rows.append({
                 "pair": pair_label,
                 "w_alt": w_alt_label,
@@ -254,7 +265,7 @@ def run(output_dir=None):
                 "logll_at_star": best["logll"],
                 "logll_geo": ll_geo,
                 "logll_bank": ll_bank,
-                "logll_improvement": best["logll"] - baseline,
+                "logll_improvement": improvement,
             })
 
     width = 110

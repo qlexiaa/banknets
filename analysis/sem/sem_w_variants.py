@@ -8,9 +8,8 @@ W matrices: W_geo | W_bank | W_bank_count | W_bank_binary | W_bank_knn4
              | W_bank_nonGeo | W_bank_interstate | W_bank_intrastate
 Samples:    Full  | Border
 
-County filter: any-NaN on Dl_nloans_b (stricter than all-NaN on Linter_ela,
-  required because Dl_nloans_b has partial-NaN counties that Panel_FE_Error
-  cannot handle).
+County filter: any-NaN on Dl_nloans_b, required because partial-NaN counties
+  cannot be used in Panel_FE_Error's balanced-panel estimator.
 
 Output: output/four_w_comparison_credit.csv
 """

@@ -690,15 +690,15 @@ def load_lambdas(output_dir):
             "bank": get_sem_lam("FE W_bank (full)"),
             "star": get_opt_lam("Pair A", "Full"),
         },
-        "border": {
-            "geo" : get_sem_lam("FE W_geo (border)"),
-            "bank": get_sem_lam("FE W_bank (border)"),
-            "star": get_opt_lam("Pair A", "Border"),
+        "contig": {
+            "geo" : get_sem_lam("FE W_geo (contig)"),
+            "bank": get_sem_lam("FE W_bank (contig)"),
+            "star": get_opt_lam("Pair A", "Contig"),
         },
-        "nonborder": {
-            "geo" : get_sem_lam("FE W_geo (nonborder)"),
-            "bank": get_sem_lam("FE W_bank (nonborder)"),
-            "star": get_opt_lam("Pair A", "NonBorder"),
+        "noncontig": {
+            "geo" : get_sem_lam("FE W_geo (noncontig)"),
+            "bank": get_sem_lam("FE W_bank (noncontig)"),
+            "star": get_opt_lam("Pair A", "NonContig"),
         },
     }
 
@@ -733,13 +733,13 @@ def run(output_dir=None):
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
     YEARS    = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
-    panel_border    = panel[panel["border"] == 1].copy()
-    panel_nonborder = panel[panel["border"] == 0].copy()
+    panel_contig    = panel[panel["border"] == 1].copy()
+    panel_noncontig = panel[panel["border"] == 0].copy()
 
     sample_specs = [
-        ("Full",      panel,            "full"),
-        ("Border",    panel_border,     "border"),
-        ("NonBorder", panel_nonborder,  "nonborder"),
+        ("Full",      panel,             "full"),
+        ("Contig",    panel_contig,      "contig"),
+        ("NonContig", panel_noncontig,   "noncontig"),
     ]
 
     # -- Main estimation loop --------------------------------------------------

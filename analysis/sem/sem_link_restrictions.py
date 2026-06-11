@@ -208,15 +208,15 @@ def load_or_build(cache_path, label, build_func, W_bank_raw, county_order):
 
 
 def estimate_variant(config, W_geo_all, W_bank_raw, W_variant_all,
-                     panel, panel_border, panel_nonborder, county_order, years, year_pos):
+                     panel, panel_contig, panel_noncontig, county_order, years, year_pos):
     T = len(years)
     rows = []
     print(f"\nEstimating {config['label']} link restriction ...")
 
     for sample_label, panel_sub in [
         ("Full",      panel),
-        ("Border",    panel_border),
-        ("NonBorder", panel_nonborder),
+        ("Contig",    panel_contig),
+        ("NonContig", panel_noncontig),
     ]:
         for w_label, W_all in [("W_geo", W_geo_all), (config["w_label"], W_variant_all)]:
             print(f"  {sample_label} x {w_label} ...", flush=True)
@@ -239,7 +239,7 @@ def estimate_variant(config, W_geo_all, W_bank_raw, W_variant_all,
 
     print()
     print(f"Lambda gap ({config['w_label']} vs W_geo):")
-    for sample_label in ["Full", "Border", "NonBorder"]:
+    for sample_label in ["Full", "Contig", "NonContig"]:
         r_geo = next((r for r in rows if r["model"] == f"W_geo ({sample_label.lower()})"), None)
         r_alt = next((r for r in rows if r["model"] == f"{config['w_label']} ({sample_label.lower()})"), None)
         if r_geo is None or r_alt is None:
@@ -300,8 +300,8 @@ def run(output_dir=None):
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
     years = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(years)}
-    panel_border    = panel[panel["border"] == 1].copy()
-    panel_nonborder = panel[panel["border"] == 0].copy()
+    panel_contig    = panel[panel["border"] == 1].copy()
+    panel_noncontig = panel[panel["border"] == 0].copy()
 
     all_results = {}
     for config in variants:
@@ -323,7 +323,7 @@ def run(output_dir=None):
 
         rows = estimate_variant(
             config, W_geo_all, W_bank_raw, W_variant_all,
-            panel, panel_border, panel_nonborder, county_order, years, year_pos,
+            panel, panel_contig, panel_noncontig, county_order, years, year_pos,
         )
 
         result_cols = [
