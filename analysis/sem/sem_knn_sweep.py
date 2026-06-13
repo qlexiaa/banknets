@@ -26,7 +26,7 @@ import spreg
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa
 from utils import row_standardize, sparse_to_pysal_w
-from panel_data import load_panel_with_credit
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit
 
 ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
@@ -40,6 +40,7 @@ LAM_GEO_CONTIG    = 0.1701
 LAM_GEO_NONCONTIG = 0.1820   # placeholder; overridden at runtime from CSV when available
 
 DV = "Dl_nloans_b"
+X_VARS = ["Linter_bra"] + CREDIT_CONTROLS
 
 
 def build_wbank_knn(W_sparse, k):
@@ -68,7 +69,9 @@ def build_wbank_knn(W_sparse, k):
 def build_arrays(panel_sub, county_order, W_knn_all, YEARS, year_pos, sample_label):
     """Build long-format arrays for Panel_FE_Error with y = Dl_nloans_b."""
     T       = len(YEARS)
-    any_nan = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+    any_nan = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
+        lambda g: g.isna().any().any()
+    )
     sub_co  = set(panel_sub["fips5"].unique())
     usable  = [c for c in county_order
                if c in sub_co and not any_nan.get(c, True)]
@@ -84,11 +87,12 @@ def build_arrays(panel_sub, county_order, W_knn_all, YEARS, year_pos, sample_lab
     t_idx_vec    = df["t_idx"].values
     year_dummies = np.column_stack([
         (t_idx_vec == year_pos[yr]).astype(np.float64) for yr in YEARS[1:]])
-    x_long = np.hstack([df["Linter_bra"].values.reshape(-1, 1), year_dummies])
+    x_long = np.hstack([df[X_VARS].values.astype(np.float64), year_dummies])
 
     assert not np.isnan(y_long).any()
+    assert not np.isnan(x_long).any()
     assert y_long.shape == (N * T, 1)
-    assert x_long.shape == (N * T, 11)
+    assert x_long.shape == (N * T, len(X_VARS) + len(YEARS) - 1)
 
     idx       = np.array([county_order.index(c) for c in usable])
     W_knn_sub = row_standardize(W_knn_all[idx, :][:, idx])
@@ -96,7 +100,7 @@ def build_arrays(panel_sub, county_order, W_knn_all, YEARS, year_pos, sample_lab
 
 
 def run_fe(y, x, w, w_label, ds_label, YEARS):
-    nx = ["Linter_bra"] + [f"yr{yr}" for yr in YEARS[1:]]
+    nx = X_VARS + [f"yr{yr}" for yr in YEARS[1:]]
     return spreg.Panel_FE_Error(
         y, x, w, name_y=DV, name_x=nx, name_w=w_label, name_ds=ds_label)
 

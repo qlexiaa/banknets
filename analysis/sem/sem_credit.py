@@ -4,8 +4,12 @@ sem_credit.py -- Panel_FE_Error with credit growth as the DV
 Uses Dl_nloans_b (dln number of commercial-bank mortgage loans, from
 Favara & Imbs HMDA data) as the dependent variable.
 
-Structural equation:
-  Dl_nloans_b_it = β * Linter_bra_it + county FE + year FE + spatial error
+Structural equation, matching Favara & Imbs (2015), equation (1):
+  Dl_nloans_b_it = beta * Linter_bra_it + gamma * X_ct
+                    + county FE + year FE + spatial error
+
+where X_ct contains LDl_nloans_b plus current and lagged changes in income per
+capita, population, HPI, and Herfindahl loan concentration.
 
 Tests whether banking deregulation (Linter_bra) caused credit growth and
 whether credit-supply shocks propagate through the same geographic or
@@ -40,17 +44,18 @@ import spreg
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa: applies spreg Panel_FE_Error compatibility patch
 from utils import row_standardize, sparse_to_pysal_w
-from panel_data import load_panel_with_credit, build_arrays, get_samples
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit, build_arrays, get_samples
 from w_variants import load_w_geo, load_bank_variants
 
 ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
+X_VARS      = ["Linter_bra"] + CREDIT_CONTROLS
 
 
 # ── Model runner ──────────────────────────────────────────────────────────────
 
 def run_panel_fe(y, x, w_pysal, w_label, ds_label, YEARS):
-    nx = ["Linter_bra"] + [f"yr{yr}" for yr in YEARS[1:]]
+    nx = X_VARS + [f"yr{yr}" for yr in YEARS[1:]]
     return spreg.Panel_FE_Error(
         y, x, w_pysal,
         name_y="Dl_nloans_b",
@@ -61,6 +66,7 @@ def run_panel_fe(y, x, w_pysal, w_label, ds_label, YEARS):
 
 
 def extract(res, N, T):
+    """Extract beta on Linter_bra, which remains first in name_x."""
     beta  = float(res.betas[0, 0])
     lam   = float(res.lam)
     se_b  = float(res.std_err[0])
@@ -72,20 +78,33 @@ def extract(res, N, T):
                 n_co=N,    n_obs=N * T)
 
 
-def _build_arrays_variant(panel_sub, county_order, W_all, YEARS, year_pos, sample_label):
+def _build_arrays_variant(panel_sub, county_order, W_all, YEARS, year_pos,
+                          sample_label, w_label):
     """Build long-format arrays for a variant W, reusing panel_data.build_arrays logic."""
     T       = len(YEARS)
     DV      = "Dl_nloans_b"
-    any_nan = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+    nan_y   = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+    nan_x   = panel_sub.groupby("fips5")[X_VARS].apply(lambda g: g.isna().any().any())
     sub_co  = set(panel_sub["fips5"].unique())
 
     full_rs = np.array(W_all.sum(axis=1)).flatten()
     islands = {county_order[i] for i, r in enumerate(full_rs) if r == 0}
 
-    usable = [c for c in county_order
-              if c in sub_co and not any_nan.get(c, True) and c not in islands]
+    before_controls = [
+        c for c in county_order
+        if c in sub_co and not nan_y.get(c, True) and c not in islands
+    ]
+    usable = [
+        c for c in before_controls
+        if not nan_x.get(c, True)
+    ]
     N      = len(usable)
     u_pos  = {c: i for i, c in enumerate(usable)}
+    print(
+        f"    N before controls={len(before_controls)} | "
+        f"after control NaN-drop={N} ({sample_label} x {w_label})",
+        flush=True,
+    )
 
     df = (panel_sub[panel_sub["fips5"].isin(set(usable))]
           .assign(t_idx=lambda d: d["year"].map(year_pos),
@@ -96,11 +115,12 @@ def _build_arrays_variant(panel_sub, county_order, W_all, YEARS, year_pos, sampl
     t_idx_vec    = df["t_idx"].values
     year_dummies = np.column_stack([
         (t_idx_vec == year_pos[yr]).astype(np.float64) for yr in YEARS[1:]])
-    x_long = np.hstack([df["Linter_bra"].values.reshape(-1, 1), year_dummies])
+    x_long = np.hstack([df[X_VARS].values.astype(np.float64), year_dummies])
 
     assert not np.isnan(y_long).any(), f"NaN in y ({sample_label})"
+    assert not np.isnan(x_long).any(), f"NaN in X ({sample_label})"
     assert y_long.shape == (N * T, 1)
-    assert x_long.shape == (N * T, 11)
+    assert x_long.shape == (N * T, len(X_VARS) + len(YEARS) - 1)
 
     idx   = np.array([county_order.index(c) for c in usable])
     W_sub = row_standardize(W_all[idx, :][:, idx])
@@ -139,7 +159,8 @@ def run(output_dir=None):
         print(f"  Estimating: {sample_label} x W_geo ...", flush=True)
         try:
             y, x, w, N = _build_arrays_variant(
-                panel_sub, county_order, W_geo_all, YEARS, year_pos, sample_label)
+                panel_sub, county_order, W_geo_all, YEARS, year_pos,
+                sample_label, "W_geo")
             res = run_panel_fe(y, x, w, "W_geo", sample_label, YEARS)
             results[(sample_label, "W_geo")] = extract(res, N, T)
         except Exception as exc:
@@ -151,7 +172,8 @@ def run(output_dir=None):
             print(f"  Estimating: {sample_label} x {w_name} ...", flush=True)
             try:
                 y, x, w, N = _build_arrays_variant(
-                    panel_sub, county_order, W_all, YEARS, year_pos, sample_label)
+                    panel_sub, county_order, W_all, YEARS, year_pos,
+                    sample_label, w_name)
                 res = run_panel_fe(y, x, w, w_name, sample_label, YEARS)
                 results[(sample_label, w_name)] = extract(res, N, T)
             except Exception as exc:
@@ -178,7 +200,7 @@ def run(output_dir=None):
     print()
     print("=" * W_COL)
     print("Panel_FE_Error -- DV: Dl_nloans_b (dln commercial-bank mortgage loans)")
-    print("Regressor: Linter_bra (deregulation instrument) | Two-way FE (ML)")
+    print("Regressors: " + ", ".join(X_VARS) + " | Two-way FE (ML)")
     print("=" * W_COL)
     print(f"{'Sample':<12} {'W matrix':<22} {'N':>5}  "
           f"{'beta':>8} {'SE':>6}  "

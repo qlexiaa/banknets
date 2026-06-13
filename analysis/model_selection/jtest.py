@@ -12,7 +12,7 @@ Mechanism (verified from spreg source):
 
 J-test direction (H0=W_null, H1=W_alt):
   1. Estimate Panel_FE_Error with W_alt → m_alt = get_m_hat(res_alt)
-  2. x_aug = hstack([x_long, m_alt])  -- shape (N*T, 12)
+  2. x_aug = hstack([x_long, m_alt])
   3. Estimate Panel_FE_Error with W_null on (y, x_aug)
   4. J-coeff = res_aug.betas[-2, 0],  J-SE = res_aug.std_err[-2],
      J-z, J-p = res_aug.z_stat[-2]   -- two-sided
@@ -42,7 +42,7 @@ import spreg
 import sys
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa: applies spreg compatibility patch
-from panel_data import load_panel_with_credit
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit
 from utils import row_standardize, sparse_to_pysal_w
 from panel_data import get_samples
 from w_variants import load_w_geo, load_bank_variants
@@ -50,6 +50,7 @@ from w_variants import load_w_geo, load_bank_variants
 ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 DV          = "Dl_nloans_b"
+X_VARS      = ["Linter_bra"] + CREDIT_CONTROLS
 
 
 # ── Core helpers ─────────────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ def run_jtest_direction(y_long, x_long, m_alt, w_null_pysal,
     Parameters
     ----------
     y_long        : (N*T, 1) outcome array
-    x_long        : (N*T, 11) regressor array (Linter_bra + 10 year dummies)
+    x_long        : (N*T, k) regressor array (Linter_bra + controls + year dummies)
     m_alt         : (N*T, 1) spatial prediction from the alternative model
     w_null_pysal  : PySAL W object for the null specification
     w_null_label  : string label for W_null
@@ -86,8 +87,8 @@ def run_jtest_direction(y_long, x_long, m_alt, w_null_pysal,
     -------
     dict with j_coeff, j_se, j_z, j_p (two-sided), reject (p < 0.05)
     """
-    x_aug = np.hstack([x_long, m_alt])   # (N*T, 12)
-    nx    = ["Linter_bra"] + [f"yr{yr}" for yr in YEARS[1:]] + ["m_alt"]
+    x_aug = np.hstack([x_long, m_alt])
+    nx    = X_VARS + [f"yr{yr}" for yr in YEARS[1:]] + ["m_alt"]
 
     res_aug = spreg.Panel_FE_Error(
         y_long, x_aug, w_null_pysal,
@@ -117,7 +118,7 @@ def run_pair(panel_sub, county_order, W_null_all, W_alt_all,
     the null-model augmented regression.
 
     County filtering:
-      1. Counties present in panel_sub with no missing Dl_nloans_b
+      1. Counties present in panel_sub with no missing Dl_nloans_b or controls
       2. Full-matrix islands (zero rows) in EITHER W are excluded
     """
     T = len(YEARS)
@@ -130,7 +131,9 @@ def run_pair(panel_sub, county_order, W_null_all, W_alt_all,
         {county_order[i] for i, r in enumerate(full_rs_alt)  if r == 0}
     )
 
-    any_nan = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+    any_nan = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
+        lambda g: g.isna().any().any()
+    )
     sub_co = set(panel_sub["fips5"].unique())
     usable = [
         c for c in county_order
@@ -154,11 +157,12 @@ def run_pair(panel_sub, county_order, W_null_all, W_alt_all,
         (t_idx_vec == year_pos[yr]).astype(np.float64)
         for yr in YEARS[1:]
     ])
-    x_long = np.hstack([df["Linter_bra"].values.reshape(-1, 1), year_dummies])
+    x_long = np.hstack([df[X_VARS].values.astype(np.float64), year_dummies])
 
     assert not np.isnan(y_long).any(), f"NaN in y ({sample_label})"
+    assert not np.isnan(x_long).any(), f"NaN in X ({sample_label})"
     assert y_long.shape == (N * T, 1),  f"y shape {y_long.shape}"
-    assert x_long.shape == (N * T, 11), f"x shape {x_long.shape}"
+    assert x_long.shape == (N * T, len(X_VARS) + len(YEARS) - 1), f"x shape {x_long.shape}"
 
     # Common W submatrices, row-standardised
     idx          = np.array([county_order.index(c) for c in usable])
@@ -166,7 +170,7 @@ def run_pair(panel_sub, county_order, W_null_all, W_alt_all,
     w_alt_pysal  = sparse_to_pysal_w(row_standardize(W_alt_all[idx, :][:, idx]))
 
     # ── Base estimates (both W, same county set) ──────────────────────────────
-    nx = ["Linter_bra"] + [f"yr{yr}" for yr in YEARS[1:]]
+    nx = X_VARS + [f"yr{yr}" for yr in YEARS[1:]]
 
     res_null = spreg.Panel_FE_Error(
         y_long, x_long, w_null_pysal,

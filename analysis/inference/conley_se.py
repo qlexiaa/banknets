@@ -4,7 +4,8 @@ conley_se_comparison.py
 Compares four standard-error estimators for the Favara & Imbs (2015) credit
 first-stage regression under the same panel as sem_credit.py:
 
-  Dl_nloans_b_it = beta * Linter_bra_it + county FE + year FE + u_it
+  Dl_nloans_b_it = beta * Linter_bra_it + gamma * X_ct
+                    + county FE + year FE + u_it
 
 Four estimators, identical point estimate:
   1. State-clustered         -- Favara & Imbs (2015) baseline, clustered by state_n
@@ -57,17 +58,20 @@ import scipy.stats as st
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa: applies spreg patch
 from utils import row_standardize
-from panel_data import load_panel_with_credit
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit
 from w_variants import load_w_geo, load_bank_variants
 
 ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 DV = "Dl_nloans_b"
+X_VARS = ["Linter_bra"] + CREDIT_CONTROLS
 
 ESTIMATOR_LABELS = [
     "State clustering (Favara-Imbs)",
     "Spatial HAC W_geo",
     "Spatial HAC W_bank",
+    "Spatial HAC W_bank_knn3",
+    "Spatial HAC W_bank_knn4",
     "State + Spatial HAC W_bank",
 ]
 
@@ -96,29 +100,22 @@ def two_way_within(arr_TN):
     return z - year_mean                          # step 3: subtract year mean
 
 
-def ols_scalar(y_flat, x_flat):
-    """
-    OLS with scalar (1-d) regressor after within-transformation.
-
-    beta = (x'x)^{-1} x'y = (x'y) / (x'x)
-    u    = y - beta * x
-
-    Returns (beta float, u np.ndarray shape (N*T,), XtX scalar).
-    """
-    XtX  = float(x_flat @ x_flat)
-    Xty  = float(x_flat @ y_flat)
-    beta = Xty / XtX
-    u    = y_flat - beta * x_flat
-    return beta, u, XtX
+def ols_matrix(y_flat, X_flat):
+    """OLS after within-transformation for the controlled X matrix."""
+    XtX = X_flat.T @ X_flat
+    XtX_inv = np.linalg.inv(XtX)
+    beta = XtX_inv @ (X_flat.T @ y_flat)
+    u = y_flat - X_flat @ beta
+    return beta, u, XtX_inv
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Sandwich meat estimators
 # ══════════════════════════════════════════════════════════════════════════════
 
-def meat_spatial(u_TN, x_TN, W_sp):
+def meat_spatial(u_TN, X_TNK, W_sp):
     """
-    Conley (1999) spatial HAC meat for a scalar regressor.
+    Conley (1999) spatial HAC meat for a controlled regressor matrix.
 
     B_spatial = sum_t  sum_c  sum_{c'}  w_{cc'} u_ct u_{c't} x_ct x_{c't}
               = sum_t  v_t' W v_t
@@ -132,22 +129,22 @@ def meat_spatial(u_TN, x_TN, W_sp):
     Parameters
     ----------
     u_TN : (T, N) within-transformed OLS residuals (time-major)
-    x_TN : (T, N) within-transformed Linter_bra
+    X_TNK : (T, N, K) within-transformed regressors
     W_sp : (N, N) scipy sparse weight matrix, used as-is (no re-standardisation)
 
     Returns
     -------
-    B : scalar
+    B : (K, K) meat matrix
     """
-    B = 0.0
+    K = X_TNK.shape[2]
+    B = np.zeros((K, K))
     for t in range(u_TN.shape[0]):
-        v_t   = u_TN[t] * x_TN[t]    # (N,) element-wise: score at period t
-        Wv_t  = W_sp @ v_t            # (N,) sparse mat-vec: W-weighted sum
-        B    += float(v_t @ Wv_t)    # v_t' (W v_t) -- captures spatial covariance
+        S_t = u_TN[t, :, None] * X_TNK[t]   # (N, K)
+        B += S_t.T @ (W_sp @ S_t)
     return B
 
 
-def meat_cluster_state(u_TN, x_TN, county_states):
+def meat_cluster_state(u_TN, X_TNK, county_states):
     """
     State-clustered sandwich meat.
 
@@ -160,33 +157,34 @@ def meat_cluster_state(u_TN, x_TN, county_states):
     Parameters
     ----------
     u_TN          : (T, N) residuals
-    x_TN          : (T, N) within-transformed regressors
+    X_TNK         : (T, N, K) within-transformed regressors
     county_states : (N,) integer state id for each county in the sample
 
     Returns
     -------
-    B_state : scalar
+    B_state : (K, K) meat matrix
     G       : int, number of unique states in the sample
     """
-    # Sum score over time periods for each county: shape (N,)
-    county_scores = (u_TN * x_TN).sum(axis=0)
+    # Sum score over time periods for each county: shape (N, K)
+    county_scores = (u_TN[:, :, None] * X_TNK).sum(axis=0)
 
     states = np.unique(county_states)
     G = len(states)
-    B = 0.0
+    K = X_TNK.shape[2]
+    B = np.zeros((K, K))
     for s in states:
         mask        = (county_states == s)
-        state_score = float(county_scores[mask].sum())   # sum within state
-        B          += state_score ** 2
+        state_score = county_scores[mask].sum(axis=0)
+        B          += np.outer(state_score, state_score)
     return B, G
 
 
-def meat_twoway_overlap(u_TN, x_TN, W_sp, county_states):
+def meat_twoway_overlap(u_TN, X_TNK, W_sp, county_states):
     """
     True overlap term for the Colella et al. (2019) two-way SE correction.
 
-    B_overlap = sum_t  sum_{c,c'} w_{cc'} * 1{state(c)==state(c')}
-                                          * u_ct u_{c't} x_ct x_{c't}
+    B_overlap = sum_t sum_{c,c'} w_{cc'} * 1{state(c)==state(c')}
+                                      * u_ct u_{c't} X_ct X_{c't}'
 
     This is the part that BOTH B_state and B_spatial share: within-state
     county pairs that are also spatially linked (w_{cc'} > 0).  Subtracting
@@ -215,11 +213,11 @@ def meat_twoway_overlap(u_TN, x_TN, W_sp, county_states):
     W_dense  = W_sp.toarray()                          # (N, N)
     W_masked = W_dense * same_state.astype(np.float64) # (N, N), within-state links only
 
-    B = 0.0
+    K = X_TNK.shape[2]
+    B = np.zeros((K, K))
     for t in range(u_TN.shape[0]):
-        v_t  = u_TN[t] * x_TN[t]    # (N,) score at period t
-        Wv_t = W_masked @ v_t        # (N,) spatial sum restricted to same state
-        B   += float(v_t @ Wv_t)
+        S_t = u_TN[t, :, None] * X_TNK[t]
+        B += S_t.T @ (W_masked @ S_t)
     return B
 
 
@@ -246,18 +244,10 @@ def meat_twoway(B_state, B_spatial_bank, B_overlap):
 # Variance and SE helpers
 # ══════════════════════════════════════════════════════════════════════════════
 
-def sandwich_se(XtX, meat, df_corr):
-    """
-    Sandwich SE for a scalar OLS estimator (k = 1).
-
-    Var(beta_hat) = (X'X)^{-1} * B * (X'X)^{-1} * df_corr
-                 = B / XtX^2 * df_corr       (k = 1 scalar case)
-
-    Clamps to 0 before sqrt to guard against numerical noise yielding tiny
-    negative values.
-    """
-    var = (meat / (XtX ** 2)) * df_corr
-    return float(np.sqrt(max(var, 0.0)))
+def sandwich_se(XtX_inv, meat, df_corr, param_idx=0):
+    """Sandwich SE for one coefficient in the controlled OLS estimator."""
+    vcv = XtX_inv @ meat @ XtX_inv * df_corr
+    return float(np.sqrt(max(vcv[param_idx, param_idx], 0.0)))
 
 
 def df_cluster(G):
@@ -281,13 +271,14 @@ def stars(p):
 # Sample construction
 # ══════════════════════════════════════════════════════════════════════════════
 
-def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos):
+def build_sample(panel_sub, county_order, W_geo_all, W_bank_all,
+                 W_knn3_all, W_knn4_all, YEARS, year_pos):
     """
     Build within-transformed arrays for one sample (full or border).
 
     County filter is identical to panel_fe_credit.build_arrays:
       - Counties present in panel_sub
-      - No county with any NaN in Dl_nloans_b (balanced panel requirement)
+      - No county with any NaN in Dl_nloans_b or controlled regressors
 
     W submatrices are NOT re-standardised (per user spec -- W_*_all is already
     row-standardised; subsetting introduces minor row-sum deviations from 1 but
@@ -298,7 +289,9 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
     T = len(YEARS)
 
     # -- County filter (matches panel_fe_credit.build_arrays exactly) ---------
-    any_nan    = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+    any_nan    = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
+        lambda g: g.isna().any().any()
+    )
     sub_co     = set(panel_sub["fips5"].unique())
     usable     = [c for c in county_order
                   if c in sub_co and not any_nan.get(c, True)]
@@ -310,12 +303,12 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
                   c_idx=lambda d: d["fips5"].map(usable_pos))
           .sort_values(["t_idx", "c_idx"]))
 
-    y_flat  = df[DV].values.astype(np.float64)            # (N*T,) time-major
-    lb_flat = df["Linter_bra"].values.astype(np.float64)   # (N*T,)
+    y_flat = df[DV].values.astype(np.float64)            # (N*T,) time-major
+    X_flat = df[X_VARS].values.astype(np.float64)         # (N*T,K)
 
-    assert not np.isnan(y_flat).any(),  f"NaN in {DV}"
-    assert not np.isnan(lb_flat).any(), "NaN in Linter_bra"
-    assert len(y_flat) == N * T,        f"length mismatch: {len(y_flat)} != {N*T}"
+    assert not np.isnan(y_flat).any(), f"NaN in {DV}"
+    assert not np.isnan(X_flat).any(), "NaN in controlled X"
+    assert len(y_flat) == N * T,       f"length mismatch: {len(y_flat)} != {N*T}"
 
     # -- State mapping: one state per county, time-invariant ------------------
     county_states = (
@@ -327,27 +320,37 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
 
     # -- Two-way within transformation ----------------------------------------
     # Reshape to (T, N) for vectorised ops; data is sorted time-major
-    y_TN  = y_flat.reshape(T, N)
-    lb_TN = lb_flat.reshape(T, N)
+    K = len(X_VARS)
+    y_TN = y_flat.reshape(T, N)
+    X_TNK = X_flat.reshape(T, N, K)
 
     y_tilde = two_way_within(y_TN)    # (T, N)
-    x_tilde = two_way_within(lb_TN)   # (T, N)
+    X_tilde = np.stack(
+        [two_way_within(X_TNK[:, :, j]) for j in range(K)],
+        axis=2,
+    )
 
     # -- OLS estimate and within residuals ------------------------------------
-    beta, u_flat, XtX = ols_scalar(y_tilde.flatten(), x_tilde.flatten())
+    beta_vec, u_flat, XtX_inv = ols_matrix(
+        y_tilde.flatten(),
+        X_tilde.reshape(N * T, K),
+    )
     u_TN = u_flat.reshape(T, N)       # (T, N)
 
     # -- W submatrices (no re-standardisation per spec) -----------------------
     idx        = np.array([county_order.index(c) for c in usable])
     W_geo_sub  = W_geo_all[idx, :][:, idx]    # (N, N) sparse
     W_bank_sub = W_bank_all[idx, :][:, idx]   # (N, N) sparse
+    W_knn3_sub = W_knn3_all[idx, :][:, idx]   # (N, N) sparse
+    W_knn4_sub = W_knn4_all[idx, :][:, idx]   # (N, N) sparse
 
     return dict(
         N=N, T=T, NT=N * T,
-        beta=beta, XtX=XtX,
-        x_tilde=x_tilde, u_TN=u_TN,
+        beta=float(beta_vec[0]), beta_vec=beta_vec, XtX_inv=XtX_inv,
+        x_tilde=X_tilde, u_TN=u_TN,
         county_states=county_states,
         W_geo=W_geo_sub, W_bank=W_bank_sub,
+        W_knn3=W_knn3_sub, W_knn4=W_knn4_sub,
         usable=usable,
     )
 
@@ -364,32 +367,48 @@ def compute_all_ses(s):
     """
     NT   = s["NT"]
     beta = s["beta"]
-    XtX  = s["XtX"]
+    XtX_inv = s["XtX_inv"]
     u    = s["u_TN"]      # (T, N)
-    x    = s["x_tilde"]   # (T, N)
-    k    = 1              # one regressor excluding FE
+    x    = s["x_tilde"]   # (T, N, K)
+    k    = len(X_VARS)
 
     # -- Compute raw meats ----------------------------------------------------
     B_geo            = meat_spatial(u, x, s["W_geo"])
     B_bank           = meat_spatial(u, x, s["W_bank"])
+    B_knn3           = meat_spatial(u, x, s["W_knn3"])
+    B_knn4           = meat_spatial(u, x, s["W_knn4"])
     B_state, G       = meat_cluster_state(u, x, s["county_states"])
     # True overlap: within-state AND spatially linked pairs
     B_overlap        = meat_twoway_overlap(u, x, s["W_bank"], s["county_states"])
     # Old overlap (diagonal / HC): kept for se_twoway_old column
-    B_het            = float(((u * x) ** 2).sum())
+    scores           = u[:, :, None] * x
+    B_het            = np.einsum("tnk,tnl->kl", scores, scores)
     B_two            = meat_twoway(B_state, B_bank, B_overlap)
     B_two_old        = B_state + B_bank - B_het  # previous (incorrect) formula
+
+    # -- Diagnostic: fraction of W_bank nonzero pairs that are same-state ----
+    # Sanity check for meat_twoway_overlap correctness:
+    #   If B_overlap / B_bank is close to 1, the same-state mask is suspect.
+    #   Expected: << 1 because W_bank_interstate >> W_bank_intrastate.
+    _W_bnk = s["W_bank"].toarray()
+    _ss    = (s["county_states"][:, None] == s["county_states"][None, :])
+    np.fill_diagonal(_ss, False)               # exclude diagonal
+    _nnz_bank = int((_W_bnk > 0).sum())
+    _nnz_same = int(((_W_bnk > 0) & _ss).sum())
+    frac_same_state_bank = (_nnz_same / _nnz_bank) if _nnz_bank > 0 else 0.0
 
     # -- DF corrections -------------------------------------------------------
     dfc = df_cluster(G)        # G/(G-1)           -- for cluster estimators
     dfh = df_conley(NT, k)     # NT/(NT-k-1)       -- for Conley HAC
 
     # -- Standard errors ------------------------------------------------------
-    se_state   = sandwich_se(XtX, B_state, dfc)
-    se_geo     = sandwich_se(XtX, B_geo,   dfh)
-    se_bank    = sandwich_se(XtX, B_bank,  dfh)
-    se_two     = sandwich_se(XtX, max(B_two, 0.0), dfc)     # cluster DF for twoway
-    se_two_old = sandwich_se(XtX, max(B_two_old, 0.0), dfc) # old formula (B_OLS overlap)
+    se_state   = sandwich_se(XtX_inv, B_state, dfc)
+    se_geo     = sandwich_se(XtX_inv, B_geo,   dfh)
+    se_bank    = sandwich_se(XtX_inv, B_bank,  dfh)
+    se_knn3    = sandwich_se(XtX_inv, B_knn3,  dfh)
+    se_knn4    = sandwich_se(XtX_inv, B_knn4,  dfh)
+    se_two     = sandwich_se(XtX_inv, B_two,   dfc)  # cluster DF for twoway
+    se_two_old = sandwich_se(XtX_inv, B_two_old, dfc)
 
     # -- CIs, t-stats, p-values (normal approximation) -----------------------
     z_crit = st.norm.ppf(0.975)   # 1.96
@@ -410,13 +429,24 @@ def compute_all_ses(s):
         "State clustering (Favara-Imbs)": build_row(se_state),
         "Spatial HAC W_geo":              build_row(se_geo),
         "Spatial HAC W_bank":             build_row(se_bank),
+        "Spatial HAC W_bank_knn3":        build_row(se_knn3),
+        "Spatial HAC W_bank_knn4":        build_row(se_knn4),
         "State + Spatial HAC W_bank":     r_two,
     }
     result["_meta"] = dict(
         N=s["N"], T=s["T"], G=G,
-        B_het=B_het, B_geo=B_geo, B_bank=B_bank,
-        B_state=B_state, B_overlap=B_overlap, B_two=B_two, B_two_old=B_two_old,
+        B_het=float(B_het[0, 0]),
+        B_geo=float(B_geo[0, 0]),
+        B_bank=float(B_bank[0, 0]),
+        B_knn3=float(B_knn3[0, 0]),
+        B_knn4=float(B_knn4[0, 0]),
+        B_state=float(B_state[0, 0]),
+        B_overlap=float(B_overlap[0, 0]),
+        B_two=float(B_two[0, 0]),
+        B_two_old=float(B_two_old[0, 0]),
         dfc=dfc, dfh=dfh,
+        frac_same_state_bank=frac_same_state_bank,
+        nnz_bank=_nnz_bank, nnz_bank_same=_nnz_same,
     )
     return result
 
@@ -429,12 +459,16 @@ _COLORS = {
     "State clustering (Favara-Imbs)": "#2166ac",
     "Spatial HAC W_geo":              "#4dac26",
     "Spatial HAC W_bank":             "#d01c8b",
+    "Spatial HAC W_bank_knn3":        "#a6cee3",
+    "Spatial HAC W_bank_knn4":        "#b2df8a",
     "State + Spatial HAC W_bank":     "#e66101",
 }
 _SHORT = [
     "State\nclustering",
     "Spatial HAC\n$W_{\\rm geo}$",
     "Spatial HAC\n$W_{\\rm bank}$",
+    "Spatial HAC\n$W_{\\rm knn3}$",
+    "Spatial HAC\n$W_{\\rm knn4}$",
     "Two-way\n(state + $W_{\\rm bank}$)",
 ]
 
@@ -521,8 +555,10 @@ def run(output_dir=None):
     W_geo_all, gal_order = load_w_geo(county_order)
     assert gal_order == county_order, "GAL order mismatch"
 
-    bank_vars  = load_bank_variants(county_order, W_geo_all=W_geo_all)
-    W_bank_all = bank_vars["W_bank"]
+    bank_vars        = load_bank_variants(county_order, W_geo_all=W_geo_all)
+    W_bank_all       = bank_vars["W_bank"]
+    W_bank_knn3_all  = bank_vars["W_bank_knn3"]
+    W_bank_knn4_all  = bank_vars["W_bank_knn4"]
 
     panel = load_panel_with_credit()
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
@@ -538,7 +574,7 @@ def run(output_dir=None):
     for slabel, panel_sub in samples:
         print(f"\nBuilding {slabel} sample within arrays ...", flush=True)
         s = build_sample(panel_sub, county_order, W_geo_all, W_bank_all,
-                         YEARS, year_pos)
+                         W_bank_knn3_all, W_bank_knn4_all, YEARS, year_pos)
         print(f"  N={s['N']} counties | T={s['T']} | NT={s['NT']:,} obs")
         print(f"  beta_hat = {s['beta']:.6f}  (two-way FWL)")
         print(f"  Computing spatial meats (T={s['T']} sparse mat-vecs per W) ...",
@@ -546,9 +582,24 @@ def run(output_dir=None):
         res = compute_all_ses(s)
         all_results[slabel] = res
         m = res["_meta"]
-        print(f"  G={m['G']} states | B_state={m['B_state']:.4f} | "
-              f"B_geo={m['B_geo']:.4f} | B_bank={m['B_bank']:.4f} | "
-              f"B_overlap={m['B_overlap']:.4f} | B_two={m['B_two']:.4f}")
+
+        # -- Two-way overlap diagnostic ----------------------------------------
+        _ratio = (m["B_overlap"] / m["B_bank"]
+                  if m["B_bank"] != 0 else float("nan"))
+        print(f"  G={m['G']} states")
+        print(f"  Two-way overlap diagnostic ({slabel}):")
+        print(f"    B_state        = {m['B_state']:>12.6f}")
+        print(f"    B_spatial bank = {m['B_bank']:>12.6f}   (all W_bank-linked pairs)")
+        print(f"    B_overlap      = {m['B_overlap']:>12.6f}   (within-state AND W_bank-linked)")
+        print(f"    B_overlap / B_spatial = {_ratio:.4f}"
+              f"  [expect << 1 if cross-state links dominate]")
+        print(f"    W_bank nonzero pairs : {m['nnz_bank']:,} total"
+              f"  |  {m['nnz_bank_same']:,} same-state"
+              f"  |  {m['frac_same_state_bank']*100:.2f}% same-state")
+        print(f"    B_two = B_state + B_bank - B_overlap"
+              f" = {m['B_two']:.6f}"
+              f"  ({'> B_state -- two-way SE > cluster SE' if m['B_two'] > m['B_state'] else '<= B_state -- check overlap'})")
+        print(f"  B_geo={m['B_geo']:.4f}  B_knn3={m['B_knn3']:.4f}  B_knn4={m['B_knn4']:.4f}")
 
     # -- Print formatted tables -----------------------------------------------
     W = 76
@@ -582,6 +633,11 @@ def run(output_dir=None):
                 ci_width      = r["ci_width"],
                 t_stat        = r["t_stat"],
                 p_value       = r["p_value"],
+                # Two-way meat components (same for all estimators in a sample)
+                B_state       = m["B_state"],
+                B_spatial     = m["B_bank"],
+                B_overlap     = m["B_overlap"],
+                frac_same_state_bank = m["frac_same_state_bank"],
             ))
 
         print("-" * W)
@@ -598,12 +654,15 @@ def run(output_dir=None):
         print()
         print(f"State-cluster SE check (Full): beta={fi_beta:.4f}  SE={fi_se:.4f}")
     print(f"  F&I Table 2 baseline: beta~0.028  SE~0.010")
-    print(f"  Note: spec here omits D_CTL and lagged DV -- SE differs from Table 2")
+    print("  Spec includes the F&I controls and lagged DV; beta is column 0 of X.")
 
     # -- Save CSV -------------------------------------------------------------
     if output_dir is not None:
-        cols = ["sample", "estimator", "beta", "se", "se_twoway_old",
-                "ci_lower", "ci_upper", "ci_width", "t_stat", "p_value"]
+        cols = [
+            "sample", "estimator", "beta", "se", "se_twoway_old",
+            "ci_lower", "ci_upper", "ci_width", "t_stat", "p_value",
+            "B_state", "B_spatial", "B_overlap", "frac_same_state_bank",
+        ]
         pd.DataFrame(csv_rows)[cols].to_csv(
             output_dir / "conley_se_comparison.csv", index=False)
         print(f"\nSaved conley_se_comparison.csv  to {output_dir}")

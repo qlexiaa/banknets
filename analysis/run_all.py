@@ -25,6 +25,7 @@ from sem import (
     sem_credit,
     sem_knn_sweep,
     sem_link_restrictions,
+    sem_w1994,
     sem_w_variants,
 )
 
@@ -69,6 +70,8 @@ def main():
              lambda: slx_exposure.run(OUTPUT_DIR))
     run_step("17. SAR multiplier decomposition and counterfactual",
              lambda: multiplier_counterfactual.run(OUTPUT_DIR))
+    run_step("18. Look-ahead robustness -- W_bank_1994",
+             lambda: sem_w1994.run(OUTPUT_DIR))
 
 
 if __name__ == "__main__":

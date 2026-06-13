@@ -4,7 +4,8 @@ sar_iv_credit.py
 IV-SAR estimation of credit growth following Kelejian & Prucha (1998).
 
 Model:
-  y_it = rho (W y)_it + beta * Linter_bra_it + alpha_i + tau_t + xi_it
+  y_it = rho (W y)_it + beta * Linter_bra_it + gamma * X_ct
+         + alpha_i + tau_t + xi_it
 
 The spatial lag (Wy)_it is endogenous. Instruments are spatial lags of the
 exogenous regressor:
@@ -42,7 +43,7 @@ import scipy.stats as st
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa
 from utils import row_standardize, sparse_to_pysal_w
-from panel_data import load_panel_with_credit
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit
 from w_variants import load_w_geo, load_bank_variants
 
 # esda is used only for Moran's I
@@ -58,6 +59,7 @@ SAR_CSV     = ROOT / "output" / "sar_robustness_credit.csv"
 CONLEY_CSV  = ROOT / "output" / "conley_se_comparison.csv"
 DV          = "Dl_nloans_b"
 MORAN_PERMS = 999
+X_VARS      = ["Linter_bra"] + CREDIT_CONTROLS
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -242,27 +244,25 @@ def cluster_se_2sls(Z_hat, xi, state_idx_flat, G, k_params):
 # OLS state-clustered SE (for comparison row)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def ols_cluster_se_scalar(x_flat, y_flat, state_idx_flat, G):
+def ols_cluster_se_beta(X_flat, y_flat, state_idx_flat, G, param_idx=0):
     """
-    State-clustered SE for scalar OLS (k=1, just Linter_bra).
-    Returns (beta, se).
+    State-clustered SE for a selected OLS coefficient in the controlled model.
+    Returns (beta[param_idx], se[param_idx]).
     """
-    XtX   = float(x_flat @ x_flat)
-    beta  = float(x_flat @ y_flat) / XtX
-    u     = y_flat - beta * x_flat
+    beta, _, u, XtX_inv = ols_fit(X_flat, y_flat)
     NT    = len(y_flat)
-    k     = 1
+    k     = X_flat.shape[1]
 
     states = np.unique(state_idx_flat)
-    B = 0.0
+    B = np.zeros((k, k))
     for s in states:
         mask    = state_idx_flat == s
-        score_s = float((x_flat[mask] * u[mask]).sum())
-        B      += score_s ** 2
+        score_s = X_flat[mask].T @ u[mask]
+        B      += np.outer(score_s, score_s)
 
     corr = (G / (G - 1)) * ((NT - 1) / (NT - k))
-    var  = (B / (XtX ** 2)) * corr
-    return beta, float(np.sqrt(max(var, 0.0)))
+    vcv  = XtX_inv @ B @ XtX_inv * corr
+    return float(beta[param_idx]), float(np.sqrt(max(vcv[param_idx, param_idx], 0.0)))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -325,7 +325,7 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
 
     Returns a dict with:
       N, T, NT, beta, XtX — basic stats
-      y_TN, d_TN           — raw (T,N) arrays for credit growth, Linter_bra
+      y_TN, d_TN, controls_TNK — raw arrays for credit growth and X
       county_states        — (N,) state ids
       state_idx_flat       — (NT,) state ids for each obs (time-major)
       W_geo_sub, W_bank_sub — (N,N) row-standardised sparse submatrices
@@ -334,7 +334,9 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
     T = len(YEARS)
 
     # ── County filter (same as panel_data.py) ─────────────────────────
-    any_nan    = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+    any_nan    = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
+        lambda g: g.isna().any().any()
+    )
     sub_co     = set(panel_sub["fips5"].unique())
     usable     = [c for c in county_order
                   if c in sub_co and not any_nan.get(c, True)]
@@ -346,11 +348,13 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
                   c_idx=lambda d: d["fips5"].map(usable_pos))
           .sort_values(["t_idx", "c_idx"]))
 
-    y_flat  = df[DV].values.astype(np.float64)
-    d_flat  = df["Linter_bra"].values.astype(np.float64)
+    y_flat = df[DV].values.astype(np.float64)
+    d_flat = df["Linter_bra"].values.astype(np.float64)
+    c_flat = df[CREDIT_CONTROLS].values.astype(np.float64)
 
     assert not np.isnan(y_flat).any()
     assert not np.isnan(d_flat).any()
+    assert not np.isnan(c_flat).any()
     assert len(y_flat) == N * T
 
     # ── State mapping ─────────────────────────────────────────────────────
@@ -368,6 +372,7 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
         N=N, T=T, NT=N * T,
         y_TN=y_flat.reshape(T, N),
         d_TN=d_flat.reshape(T, N),
+        controls_TNK=c_flat.reshape(T, N, len(CREDIT_CONTROLS)),
         county_states=county_states,
         state_idx_flat=state_idx_flat,
         W_geo_sub=W_geo_sub,
@@ -389,8 +394,8 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
       1. Select W = W_geo_sub or W_bank_sub
       2. Compute spatial lags: z = W@y, q1 = W@d, q2 = W@q1
       3. Two-way within-transform all variables
-      4. First stage: z_tilde ~ [x_tilde, q1_tilde, q2_tilde]
-      5. Second stage: y_tilde ~ [z_hat_tilde, x_tilde]
+      4. First stage: z_tilde ~ [x_tilde, controls_tilde, q1_tilde, q2_tilde]
+      5. Second stage: y_tilde ~ [z_hat_tilde, x_tilde, controls_tilde]
       6. 2SLS residuals from ORIGINAL z_tilde (not z_hat)
       7. State-clustered sandwich SE
       8. Moran's I on residuals under W_bank
@@ -401,6 +406,8 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
     W_sub = s["W_geo_sub"] if W_label == "W_geo" else s["W_bank_sub"]
     y_TN  = s["y_TN"]
     d_TN  = s["d_TN"]
+    controls_TNK = s["controls_TNK"]
+    controls_TNK = s["controls_TNK"]
 
     if verbose:
         print(f"\n  [{sample_label} | {W_label}] N={N} T={T} NT={NT:,}")
@@ -421,6 +428,10 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
     y_tilde  = two_way_within(y_TN)   # (T, N)
     z_tilde  = two_way_within(z_TN)
     x_tilde  = two_way_within(d_TN)
+    controls_tilde = np.stack(
+        [two_way_within(controls_TNK[:, :, j]) for j in range(controls_TNK.shape[2])],
+        axis=2,
+    )
     q1_tilde = two_way_within(q1_TN)
     q2_tilde = two_way_within(q2_TN)
 
@@ -428,19 +439,21 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
     y_f  = y_tilde.flatten()
     z_f  = z_tilde.flatten()
     x_f  = x_tilde.flatten()
+    C_f  = controls_tilde.reshape(NT, controls_tilde.shape[2])
     q1_f = q1_tilde.flatten()
     q2_f = q2_tilde.flatten()
+    X_exog = np.column_stack([x_f, C_f])
 
     # ── Step 3: OLS baseline (for comparison table row) ─────────────────────
     G   = len(np.unique(s["state_idx_flat"]))
-    ols_beta, ols_se = ols_cluster_se_scalar(
-        x_f, y_f, s["state_idx_flat"], G
+    ols_beta, ols_se = ols_cluster_se_beta(
+        X_exog, y_f, s["state_idx_flat"], G, param_idx=0
     )
 
     # ── Step 4: First stage ─────────────────────────────────────────────────
-    # z_tilde ~ x_tilde + q1_tilde + q2_tilde
+    # z_tilde ~ x_tilde + controls_tilde + q1_tilde + q2_tilde
     # Excluded instruments: q1_tilde, q2_tilde (last 2 columns)
-    X_fs = np.column_stack([x_f, q1_f, q2_f])   # (NT, 3)
+    X_fs = np.column_stack([X_exog, q1_f, q2_f])
     delta_fs, z_hat_f, resid_fs, _ = ols_fit(X_fs, z_f)
     F_stat, df1, df2, R2_unr, R2_restr = f_test_excluded(z_f, X_fs, n_excl=2)
 
@@ -461,8 +474,8 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
     cond_num_instr = float(np.linalg.cond(np.column_stack([q1_f, q2_f])))
 
     if verbose:
-        print(f"  First stage: alpha_WD={delta_fs[1]:.4f}  "
-              f"alpha_W2D={delta_fs[2]:.4f}  "
+        print(f"  First stage: alpha_WD={delta_fs[-2]:.4f}  "
+              f"alpha_W2D={delta_fs[-1]:.4f}  "
               f"R2={R2_unr:.4f}  F(2,{df2})={F_stat:.2f}  F_cl={F_cluster:.2f}")
         print(f"  corr(WD,W2D)={corr_q1q2:.4f}  corr(W2D,W3D)={corr_q2q3:.4f}  "
               f"cond={cond_num_instr:.1f}")
@@ -471,20 +484,22 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
                   f" under {W_label} with caution")
 
     # ── Step 5: Second stage ─────────────────────────────────────────────────
-    # y_tilde ~ z_hat_tilde + x_tilde
-    Z_hat = np.column_stack([z_hat_f, x_f])   # (NT, 2) with instrumented z
+    # y_tilde ~ z_hat_tilde + x_tilde + controls_tilde
+    Z_hat = np.column_stack([z_hat_f, X_exog])
     delta_ss, _, _, ZtZ_inv = ols_fit(Z_hat, y_f)
     rho_hat  = float(delta_ss[0])    # spatial autoregressive parameter
     beta_hat = float(delta_ss[1])    # deregulation effect
 
     # ── Step 6: 2SLS residuals (use ORIGINAL z, not z_hat) ──────────────────
-    # xi = y_tilde - z_tilde * rho - x_tilde * beta   [CORRECT 2SLS residual]
-    Z_orig = np.column_stack([z_f, x_f])   # (NT, 2) with original (endogenous) z
+    # xi = y_tilde - z_tilde * rho - X_tilde * delta [CORRECT 2SLS residual]
+    Z_orig = np.column_stack([z_f, X_exog])
     xi_f   = y_f - Z_orig @ delta_ss
 
     # ── Step 7: State-clustered 2SLS sandwich SE ────────────────────────────
     # Bread uses Z_hat (instrumented); meat uses xi from original Z
-    vcv, se_2sls = cluster_se_2sls(Z_hat, xi_f, s["state_idx_flat"], G, k_params=2)
+    vcv, se_2sls = cluster_se_2sls(
+        Z_hat, xi_f, s["state_idx_flat"], G, k_params=Z_hat.shape[1]
+    )
     rho_se   = float(se_2sls[0])
     beta_se  = float(se_2sls[1])
 
@@ -526,8 +541,8 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
         first_stage_df1       = int(df1),
         first_stage_df2       = int(df2),
         first_stage_R2        = float(R2_unr),
-        alpha_WD              = float(delta_fs[1]),
-        alpha_W2D             = float(delta_fs[2]),
+        alpha_WD              = float(delta_fs[-2]),
+        alpha_W2D             = float(delta_fs[-1]),
         # Instrument collinearity
         corr_q1q2             = corr_q1q2,
         corr_q2q3             = corr_q2q3,
@@ -600,6 +615,10 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
     y_tilde  = two_way_within(y_TN)
     z_tilde  = two_way_within(z_TN)
     x_tilde  = two_way_within(d_TN)
+    controls_tilde = np.stack(
+        [two_way_within(controls_TNK[:, :, j]) for j in range(controls_TNK.shape[2])],
+        axis=2,
+    )
     q1_tilde = two_way_within(q1_TN)
     q2_tilde = two_way_within(q2_TN)
     q3_tilde = two_way_within(q3_TN)
@@ -607,13 +626,15 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
     y_f  = y_tilde.flatten()
     z_f  = z_tilde.flatten()
     x_f  = x_tilde.flatten()
+    C_f  = controls_tilde.reshape(NT, controls_tilde.shape[2])
     q1_f = q1_tilde.flatten()
     q2_f = q2_tilde.flatten()
     q3_f = q3_tilde.flatten()
+    X_exog = np.column_stack([x_f, C_f])
 
-    # ── Step 3: First stage: z_tilde ~ [x, q1(WD), q2(W2D), q3(W3D)] ───────
+    # ── Step 3: First stage: z_tilde ~ [x, controls, WD, W2D, W3D] ──────────
     # q1=WD is included; q2=W2D and q3=W3D are excluded (last 2 columns)
-    X_fs = np.column_stack([x_f, q1_f, q2_f, q3_f])   # (NT, 4)
+    X_fs = np.column_stack([X_exog, q1_f, q2_f, q3_f])
     delta_fs, z_hat_f, resid_fs, _ = ols_fit(X_fs, z_f)
     F_stat, df1, df2, R2_unr, R2_restr = f_test_excluded(z_f, X_fs, n_excl=2)
 
@@ -628,31 +649,33 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
     cond_num_instr = float(np.linalg.cond(np.column_stack([q1_f, q2_f, q3_f])))
 
     if verbose:
-        print(f"  SDM first stage: alpha_WD={delta_fs[1]:.4f}  "
-              f"alpha_W2D={delta_fs[2]:.4f}  alpha_W3D={delta_fs[3]:.4f}  "
+        print(f"  SDM first stage: alpha_WD={delta_fs[-3]:.4f}  "
+              f"alpha_W2D={delta_fs[-2]:.4f}  alpha_W3D={delta_fs[-1]:.4f}  "
               f"R2={R2_unr:.4f}  F(2,{df2})={F_stat:.2f}  F_cl={F_cluster:.2f}")
         print(f"  corr(WD,W2D)={corr_q1q2:.4f}  corr(W2D,W3D)={corr_q2q3:.4f}  "
               f"cond={cond_num_instr:.1f}")
         if F_stat < 10:
             print(f"  [WEAK INSTRUMENT] F={F_stat:.2f} < 10")
 
-    # ── Step 4: Second stage: y_tilde ~ [z_hat, x, q1(WD)] ─────────────────
-    # k_params = 3: (rho, beta_D, theta_WD)
-    Z_hat = np.column_stack([z_hat_f, x_f, q1_f])   # (NT, 3)
+    # ── Step 4: Second stage: y_tilde ~ [z_hat, x, controls, q1(WD)] ────────
+    Z_hat = np.column_stack([z_hat_f, X_exog, q1_f])
     delta_ss, _, _, _ = ols_fit(Z_hat, y_f)
     rho_hat   = float(delta_ss[0])
     beta_hat  = float(delta_ss[1])
-    theta_hat = float(delta_ss[2])
+    theta_idx = Z_hat.shape[1] - 1
+    theta_hat = float(delta_ss[theta_idx])
 
     # ── Step 5: 2SLS residuals (use ORIGINAL z, not z_hat) ──────────────────
-    Z_orig = np.column_stack([z_f, x_f, q1_f])   # (NT, 3)
+    Z_orig = np.column_stack([z_f, X_exog, q1_f])
     xi_f   = y_f - Z_orig @ delta_ss
 
     # ── Step 6: State-clustered 2SLS sandwich SE ────────────────────────────
-    vcv, se_2sls = cluster_se_2sls(Z_hat, xi_f, s["state_idx_flat"], G, k_params=3)
+    vcv, se_2sls = cluster_se_2sls(
+        Z_hat, xi_f, s["state_idx_flat"], G, k_params=Z_hat.shape[1]
+    )
     rho_se   = float(se_2sls[0])
     beta_se  = float(se_2sls[1])
-    theta_se = float(se_2sls[2])
+    theta_se = float(se_2sls[theta_idx])
 
     if verbose:
         print(f"  SDM second stage: rho={rho_hat:.4f}({rho_se:.4f})  "
@@ -693,8 +716,8 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
         first_stage_df1       = int(df1),
         first_stage_df2       = int(df2),
         first_stage_R2        = float(R2_unr),
-        alpha_WD              = float(delta_fs[1]),
-        alpha_W2D             = float(delta_fs[2]),
+        alpha_WD              = float(delta_fs[-3]),
+        alpha_W2D             = float(delta_fs[-2]),
         # Instrument collinearity
         corr_q1q2             = corr_q1q2,
         corr_q2q3             = corr_q2q3,
