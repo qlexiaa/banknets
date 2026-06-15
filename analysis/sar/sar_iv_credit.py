@@ -595,6 +595,7 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
     W_sub = s["W_geo_sub"] if W_label == "W_geo" else s["W_bank_sub"]
     y_TN  = s["y_TN"]
     d_TN  = s["d_TN"]
+    controls_TNK = s["controls_TNK"]
     G     = len(np.unique(s["state_idx_flat"]))
 
     if verbose:

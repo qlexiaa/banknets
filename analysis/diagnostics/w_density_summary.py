@@ -271,6 +271,7 @@ def run(output_dir=None):
         ("W_bank",            bank_vars["W_bank"]),
         ("W_bank_count",      bank_vars["W_bank_count"]),
         ("W_bank_bin",        bank_vars["W_bank_binary"]),
+        ("W_bank_knn3",       bank_vars["W_bank_knn3"]),
         ("W_bank_knn4",       bank_vars["W_bank_knn4"]),
         ("W_bank_nonGeo",     bank_vars["W_bank_nonGeo"]),
         ("W_bank_interstate", bank_vars["W_bank_interstate"]),

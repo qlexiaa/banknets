@@ -42,6 +42,8 @@ Outputs
 import warnings
 warnings.filterwarnings("ignore")
 
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -61,6 +63,7 @@ ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 FDIC_PATH   = ROOT / "data" / "fdic_deposits_1994_2005.csv"
 CACHE_PATH  = ROOT / "data" / "W_bank_1994.npz"
+CACHE_META_PATH = CACHE_PATH.with_suffix(".meta.json")
 WAVG_PATH   = ROOT / "data" / "W_bank_avg.npz"
 YEAR_1994   = 1994
 X_VARS      = ["Linter_bra"] + CREDIT_CONTROLS
@@ -142,6 +145,33 @@ def _build_cosine_1994(county_order):
     return W_cos_raw, W_cos_rs, n_hcs
 
 
+def _county_order_fingerprint(county_order):
+    h = hashlib.sha256()
+    for fips in county_order:
+        h.update(str(fips).zfill(5).encode("ascii"))
+        h.update(b"\0")
+    return h.hexdigest()
+
+
+def _load_cache_fingerprint():
+    try:
+        meta = json.loads(CACHE_META_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    return meta.get("county_order_sha256")
+
+
+def _save_cache_metadata(fingerprint, county_count):
+    meta = {
+        "county_order_sha256": fingerprint,
+        "county_count": int(county_count),
+    }
+    CACHE_META_PATH.write_text(
+        json.dumps(meta, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _build_avg_raw_cosine(county_order):
     """
     Rebuild the raw time-averaged bank cosine matrix for persistence diagnostics.
@@ -178,16 +208,20 @@ def load_w1994(county_order):
     (needed for persistence correlation).
     """
     N = len(county_order)
+    fingerprint = _county_order_fingerprint(county_order)
 
-    if CACHE_PATH.exists():
+    if CACHE_PATH.exists() and _load_cache_fingerprint() == fingerprint:
         print(f"  Loading W_bank_1994 from cache: {CACHE_PATH.name}", flush=True)
         W_1994_rs_sp = scipy.sparse.load_npz(str(CACHE_PATH))
         # Raw cosine is not cached -- rebuild the raw array for correlation
         W_raw, _, n_hcs = _build_cosine_1994(county_order)
     else:
+        if CACHE_PATH.exists():
+            print("  W_bank_1994 cache county order mismatch; rebuilding", flush=True)
         W_raw, W_1994_rs, n_hcs = _build_cosine_1994(county_order)
         W_1994_rs_sp = scipy.sparse.csr_matrix(W_1994_rs)
         scipy.sparse.save_npz(str(CACHE_PATH), W_1994_rs_sp)
+        _save_cache_metadata(fingerprint, N)
         print(f"  Cached W_bank_1994 -> {CACHE_PATH.name}", flush=True)
 
     return W_raw, W_1994_rs_sp, n_hcs
@@ -366,14 +400,11 @@ def _extract(res, N, T):
 # ── Lambda gap test ────────────────────────────────────────────────────────────
 
 def _gap_test(r_geo, r_1994):
-    """One-sided z-test: H1: lam_1994 > lam_geo."""
+    """Descriptive lambda gap; formal p-values need paired inference."""
     if r_geo is None or r_1994 is None:
         return {k: np.nan for k in ("gap_lam", "se_gap", "z_gap", "p_gap_onesided")}
     gap    = r_1994["lam"] - r_geo["lam"]
-    se_gap = np.sqrt(r_geo["se_lam"]**2 + r_1994["se_lam"]**2)
-    z_gap  = gap / se_gap if se_gap > 0 else np.nan
-    p_gap  = float(stats.norm.sf(z_gap)) if not np.isnan(z_gap) else np.nan
-    return dict(gap_lam=gap, se_gap=se_gap, z_gap=z_gap, p_gap_onesided=p_gap)
+    return dict(gap_lam=gap, se_gap=np.nan, z_gap=np.nan, p_gap_onesided=np.nan)
 
 
 # ── Public entry point ─────────────────────────────────────────────────────────
@@ -475,21 +506,15 @@ def run(output_dir=None):
     # ── Lambda gap tests ──────────────────────────────────────────────────────
     print()
     for cmp_w in ("W_bank_1994", "W_bank_knn3", "W_bank_knn4"):
-        print(f"Lambda gap ({cmp_w} vs W_geo) -- H1: lam_{cmp_w.split('_')[-1]} > lam_geo (one-sided):")
-        print(f"{'Sample':<12} {'gap':>8} {'se_gap':>8} {'z_gap':>8} {'p(1-tail)':>10}")
-        print("-" * 52)
-
-        def _st(p):
-            if np.isnan(p): return ""
-            return "***" if p < 0.01 else ("**" if p < 0.05 else ("*" if p < 0.10 else ""))
+        print(f"Lambda gap ({cmp_w} vs W_geo) -- descriptive only; paired SE/p-value not reported:")
+        print(f"{'Sample':<12} {'gap':>8}")
+        print("-" * 24)
 
         for sample_label, _ in samples:
             r_geo = results.get((sample_label, "W_geo"))
             r_cmp = results.get((sample_label, cmp_w))
             g = _gap_test(r_geo, r_cmp)
-            print(f"  {sample_label:<12} {g['gap_lam']:>8.4f} {g['se_gap']:>8.4f} "
-                  f"{g['z_gap']:>8.3f} {g['p_gap_onesided']:>10.4f}"
-                  f" {_st(g['p_gap_onesided'])}")
+            print(f"  {sample_label:<12} {g['gap_lam']:>8.4f}")
         print()
 
     # ── Print persistence ─────────────────────────────────────────────────────

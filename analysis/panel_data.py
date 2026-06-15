@@ -53,6 +53,21 @@ def _source_with_fips(path):
     return df
 
 
+def _assert_unique_source_keys(df, source_name):
+    dup = df.duplicated(subset=["fips5", "year"], keep=False)
+    if dup.any():
+        examples = (
+            df.loc[dup, ["fips5", "year"]]
+            .drop_duplicates()
+            .head(5)
+            .to_dict("records")
+        )
+        raise ValueError(
+            f"{source_name} has duplicate (fips5, year) keys; "
+            f"examples: {examples}"
+        )
+
+
 def _merge_missing(panel, required_cols):
     """Left-merge missing replication columns while preserving panel rows."""
     missing = [c for c in required_cols if c not in panel.columns]
@@ -64,10 +79,12 @@ def _merge_missing(panel, required_cols):
         hmda_df = _source_with_fips(HMDA_PATH)
         avail = [c for c in hmda_needed if c in hmda_df.columns]
         if avail:
+            _assert_unique_source_keys(hmda_df, HMDA_PATH.name)
             panel = panel.merge(
                 hmda_df[["fips5", "year"] + avail].copy(),
                 on=["fips5", "year"],
                 how="left",
+                validate="many_to_one",
             )
 
     missing = [c for c in required_cols if c not in panel.columns]
@@ -75,10 +92,12 @@ def _merge_missing(panel, required_cols):
         controls_df = _source_with_fips(CONTROLS_PATH)
         avail = [c for c in missing if c in controls_df.columns]
         if avail:
+            _assert_unique_source_keys(controls_df, CONTROLS_PATH.name)
             panel = panel.merge(
                 controls_df[["fips5", "year"] + avail].copy(),
                 on=["fips5", "year"],
                 how="left",
+                validate="many_to_one",
             )
 
     missing = [c for c in required_cols if c not in panel.columns]

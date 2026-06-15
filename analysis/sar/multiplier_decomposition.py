@@ -76,8 +76,8 @@ def load_lambdas():
 
     for sample_tag in ["full", "contig", "noncontig"]:
         for w_tag in ["W_geo", "W_bank", "W_bank_knn3", "W_bank_knn4"]:
-            mask = (cr["model"].str.contains(w_tag, regex=False) &
-                    cr["model"].str.contains(f"({sample_tag})", regex=False))
+            expected_model = f"FE {w_tag} ({sample_tag})"
+            mask = cr["model"] == expected_model
             rows = cr.loc[mask, "lam"]
             if len(rows) > 0:
                 lam[("credit", w_tag, sample_tag)] = float(rows.iloc[0])

@@ -635,6 +635,7 @@ def print_table(rows, hausman, moran, sample_label):
 # ══════════════════════════════════════════════════════════════════════════════
 
 _PLOT_COLORS = ["#2166ac", "#4dac26", "#d01c8b", "#a6cee3", "#b2df8a", "#e66101"]
+_PLOT_ESTIMATORS = list(_COLORS.keys())
 _SHORT_LABELS = [
     "OLS",
     "FGLS\n$W_{\\rm geo}$",
@@ -659,16 +660,25 @@ def make_plot(all_rows):
         axes = [axes]
 
     xs = np.arange(len(_SHORT_LABELS))
+    slot_index = {estimator: idx for idx, estimator in enumerate(_PLOT_ESTIMATORS)}
+    color_lookup = {
+        estimator: _PLOT_COLORS[idx]
+        for idx, estimator in enumerate(_PLOT_ESTIMATORS)
+    }
     for ax, slabel in zip(axes, sample_labels):
         rlist = all_rows[slabel]
-        for i, r in enumerate(rlist):
-            col = _PLOT_COLORS[i]
-            ax.vlines(xs[i], r["ci_lower"], r["ci_upper"],
+        for r in rlist:
+            estimator = r["estimator"]
+            if estimator not in slot_index:
+                continue
+            x = xs[slot_index[estimator]]
+            col = color_lookup[estimator]
+            ax.vlines(x, r["ci_lower"], r["ci_upper"],
                       color=col, linewidth=2.5, zorder=3)
             ax.hlines([r["ci_lower"], r["ci_upper"]],
-                      xs[i] - 0.13, xs[i] + 0.13,
+                      x - 0.13, x + 0.13,
                       color=col, linewidth=1.5, zorder=3)
-            ax.scatter(xs[i], r["beta"],
+            ax.scatter(x, r["beta"],
                        color=col, s=55, zorder=5,
                        edgecolors="white", linewidths=0.8)
 
@@ -691,7 +701,7 @@ def make_plot(all_rows):
     legend_handles = [
         Line2D([0], [0], color=_PLOT_COLORS[i], linewidth=2.5,
                marker="o", markersize=6, label=ESTIMATOR_LABELS[i])
-        for i in range(len(ESTIMATOR_LABELS))
+        for i in range(len(_PLOT_ESTIMATORS))
     ]
     fig.legend(
         handles=legend_handles,

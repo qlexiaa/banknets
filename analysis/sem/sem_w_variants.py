@@ -8,8 +8,8 @@ W matrices: W_geo | W_bank | W_bank_count | W_bank_binary | W_bank_knn4
              | W_bank_nonGeo | W_bank_interstate | W_bank_intrastate
 Samples:    Full  | Border
 
-County filter: any-NaN on Dl_nloans_b, required because partial-NaN counties
-  cannot be used in Panel_FE_Error's balanced-panel estimator.
+County filter: counties with any NaN in Dl_nloans_b or X_VARS are excluded
+  so Panel_FE_Error's balanced-panel estimator receives complete DV+X data.
 
 Output: output/four_w_comparison_credit.csv
 """
@@ -38,7 +38,7 @@ X_VARS = ["Linter_bra"] + CREDIT_CONTROLS
 
 def run_one(panel_sub, county_order, W_all, w_label, sample_label, YEARS, year_pos):
     T      = len(YEARS)
-    # any-NaN filter for DV (not all-NaN — panel needs to be balanced)
+    # Exclude counties with any NaN in Dl_nloans_b or X_VARS for Panel_FE_Error.
     any_nan = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
         lambda g: g.isna().any().any()
     )

@@ -204,14 +204,12 @@ def meat_twoway_overlap(u_TN, X_TNK, W_sp, county_states):
     For W matrices with no within-state links (e.g. W_bank_interstate),
     B_overlap = 0 and B_twoway = B_state + B_spatial exactly.
     """
-    N = u_TN.shape[1]
-    # Build a within-state mask matrix (N x N), True if same state
-    same_state = (county_states[:, None] == county_states[None, :])  # (N, N) bool
-
-    # Element-wise mask of W: keep only within-state links
-    # W_sp is scipy sparse; convert to dense for element-wise product
-    W_dense  = W_sp.toarray()                          # (N, N)
-    W_masked = W_dense * same_state.astype(np.float64) # (N, N), within-state links only
+    W_coo = W_sp.tocoo()
+    keep = county_states[W_coo.row] == county_states[W_coo.col]
+    W_masked = scipy.sparse.csr_matrix(
+        (W_coo.data * keep.astype(np.float64), (W_coo.row, W_coo.col)),
+        shape=W_sp.shape,
+    )
 
     K = X_TNK.shape[2]
     B = np.zeros((K, K))
