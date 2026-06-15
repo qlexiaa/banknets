@@ -511,8 +511,11 @@ def compute_all_ses(s):
     def build_row(se, kernel, cutoff_km=float("nan"), clip_pct=0.0):
         lo   = beta - 1.96 * se
         hi   = beta + 1.96 * se
-        tval = beta / se if se > 0 else np.inf
-        pval = float(2 * st.norm.sf(abs(tval)))
+        if np.isnan(se):
+            tval, pval = float("nan"), float("nan")
+        else:
+            tval = beta / se if se > 0 else np.inf
+            pval = float(2 * st.norm.sf(abs(tval)))
         return dict(
             beta=beta, se=se,
             ci_lower=lo, ci_upper=hi, ci_width=hi - lo,
@@ -613,14 +616,14 @@ def compute_all_ses(s):
               if float(B_band_psd[0, 0]) != 0 else float("nan"))
     _ratio_overlap = (float(B_overlap_band[0, 0]) / float(B_spatial_band[0, 0])
                       if float(B_spatial_band[0, 0]) != 0 else float("nan"))
-    print(f"  Two-way diagnostic (binary_band):")
+    print("  Two-way diagnostic (binary_band):")
     print(f"    B_state[0,0]   = {float(B_state[0, 0]):>12.6f}")
     print(f"    B_spatial[0,0] = {float(B_spatial_band[0, 0]):>12.6f}  (binary band, diag=1)")
     print(f"    B_overlap[0,0] = {float(B_overlap_band[0, 0]):>12.6f}  (same-state AND band-linked)")
     print(f"    B_overlap / B_spatial = {_ratio_overlap:.4f}"
           "  [note: near 1 expected under state-year treatment --")
-    print(f"       within-state residual covariance dominates the quadratic form")
-    print(f"       even when count-based frac_same_state_band << 1]")
+    print("       within-state residual covariance dominates the quadratic form")
+    print("       even when count-based frac_same_state_band << 1]")
     print(f"    Band nonzero pairs: {_nnz_band:,} total | {_nnz_same:,} same-state"
           f" | {frac_same_state_band*100:.2f}% same-state (count-based)")
 
@@ -714,7 +717,8 @@ def _make_coef_plot(all_results):
     fig.suptitle(
         "Conley / Colella Spatial HAC vs State-Clustered Standard Errors\n"
         r"OLS: $\Delta\ln(\mathrm{loans}_{b,it}) = "
-        r"\beta\,\mathrm{Linter\_bra}_{it}$ + county FE + year FE",
+        r"\beta\,\mathrm{Linter\_bra}_{it} + \gamma^\top X_{it}$"
+        " + county FE + year FE",
         fontsize=10, y=1.03,
     )
 

@@ -407,7 +407,6 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
     y_TN  = s["y_TN"]
     d_TN  = s["d_TN"]
     controls_TNK = s["controls_TNK"]
-    controls_TNK = s["controls_TNK"]
 
     if verbose:
         print(f"\n  [{sample_label} | {W_label}] N={N} T={T} NT={NT:,}")
@@ -576,18 +575,19 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
     SDM-IV: Spatial Durbin Model estimated by IV.
 
     Structural equation (LeSage & Pace 2009, SDM extension of KP-98):
-      y_it = rho*(Wy)_it + beta_D*D_it + theta_WD*(WD)_it + alpha_i + tau_t + xi_it
+      y_it = rho*(Wy)_it + beta_D*D_it + gamma'X_it + theta_WD*(WD)_it
+             + alpha_i + tau_t + xi_it
 
     (WD) = W * Linter_bra enters as an INCLUDED regressor in BOTH stages.
     Excluded instruments for the endogenous (Wy): W2D and W3D.
 
     First stage:
-      Wy_tilde ~ [D_tilde, WD_tilde, W2D_tilde, W3D_tilde]
+      Wy_tilde ~ [D_tilde, controls_tilde, WD_tilde, W2D_tilde, W3D_tilde]
                   incl: D, WD  |  excl: W2D (last 2), W3D
 
     Second stage:
-      y_tilde ~ [Wy_hat_tilde, D_tilde, WD_tilde]
-      Parameters: (rho, beta_D, theta_WD)  [k_params = 3]
+      y_tilde ~ [Wy_hat_tilde, D_tilde, controls_tilde, WD_tilde]
+      Parameters include (rho, beta_D, gamma, theta_WD).
 
     Returns result dict with spec = 'SDM-IV'.
     """

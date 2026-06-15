@@ -20,7 +20,7 @@ from diagnostics import w_density_summary
 from extensions import multiplier_counterfactual, slx_exposure
 from inference import conley_se, fgls
 from model_selection import jtest, lm_tests
-from sar import multiplier_decomposition, sar_credit
+from sar import multiplier_decomposition, sar_credit, sar_iv_credit
 from sem import (
     sem_credit,
     sem_knn_sweep,
@@ -58,17 +58,19 @@ def main():
              lambda: jtest.run(OUTPUT_DIR))
     run_step("11. Panel_FE_Lag robustness",
              lambda: sar_credit.run(OUTPUT_DIR))
-    run_step("12. Direct/indirect effects, distance decay",
+    run_step("12. IV-SAR and SDM-IV robustness",
+             lambda: sar_iv_credit.run(OUTPUT_DIR))
+    run_step("13. Direct/indirect effects, distance decay",
              lambda: multiplier_decomposition.run(OUTPUT_DIR))
-    run_step("13. SE estimator comparison (Conley 1999; Colella et al. 2019)",
+    run_step("14. SE estimator comparison (Conley 1999; Colella et al. 2019)",
              lambda: conley_se.run(OUTPUT_DIR))
-    run_step("14. FGLS vs OLS point-estimator comparison",
+    run_step("15. FGLS vs OLS point-estimator comparison",
              lambda: fgls.run(OUTPUT_DIR))
-    run_step("15. Bank-network SLX exposure augmentation",
+    run_step("16. Bank-network SLX exposure augmentation",
              lambda: slx_exposure.run(OUTPUT_DIR))
-    run_step("16. SAR multiplier decomposition and counterfactual",
+    run_step("17. SAR multiplier decomposition and counterfactual",
              lambda: multiplier_counterfactual.run(OUTPUT_DIR))
-    run_step("17. Look-ahead robustness -- W_bank_1994",
+    run_step("18. Look-ahead robustness -- W_bank_1994",
              lambda: sem_w1994.run(OUTPUT_DIR))
 
 

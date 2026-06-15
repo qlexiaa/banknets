@@ -509,37 +509,31 @@ def run_sample(s, sample_label, lam_geo, lam_bank, lam_knn3, lam_knn4,
 
     # ── 3b. FGLS W_bank_knn3 ────────────────────────────────────────────────
     if lam_knn3 is not None:
-        try:
-            A_knn3, rho_knn3 = build_filter(W_knn3, lam_knn3)
-            beta_knn3_vec, xi_knn3, x_A_knn3 = fgls_matrix(y, x, A_knn3)
-            beta_knn3 = float(beta_knn3_vec[0])
-            se_knn3, _ = cluster_se_matrix(xi_knn3, x_A_knn3, cs)
-            rows.append(build_result_row(
-                beta_knn3, se_knn3, sample_label, "FGLS W_bank_knn3", "W_bank_knn3",
-                lam_knn3, rho_knn3, N, T, G,
-            ))
-            if verbose:
-                print(f"  FGLS knn3:  beta={beta_knn3:.6f}  SE={se_knn3:.6f}  "
-                      f"lambda={lam_knn3:.4f}  rho(W)={rho_knn3:.4f}")
-        except Exception as exc:
-            print(f"  [SKIP] FGLS W_bank_knn3 ({sample_label}): {exc}")
+        A_knn3, rho_knn3 = build_filter(W_knn3, lam_knn3)
+        beta_knn3_vec, xi_knn3, x_A_knn3 = fgls_matrix(y, x, A_knn3)
+        beta_knn3 = float(beta_knn3_vec[0])
+        se_knn3, _ = cluster_se_matrix(xi_knn3, x_A_knn3, cs)
+        rows.append(build_result_row(
+            beta_knn3, se_knn3, sample_label, "FGLS W_bank_knn3", "W_bank_knn3",
+            lam_knn3, rho_knn3, N, T, G,
+        ))
+        if verbose:
+            print(f"  FGLS knn3:  beta={beta_knn3:.6f}  SE={se_knn3:.6f}  "
+                  f"lambda={lam_knn3:.4f}  rho(W)={rho_knn3:.4f}")
 
     # ── 3c. FGLS W_bank_knn4 ────────────────────────────────────────────────
     if lam_knn4 is not None:
-        try:
-            A_knn4, rho_knn4 = build_filter(W_knn4, lam_knn4)
-            beta_knn4_vec, xi_knn4, x_A_knn4 = fgls_matrix(y, x, A_knn4)
-            beta_knn4 = float(beta_knn4_vec[0])
-            se_knn4, _ = cluster_se_matrix(xi_knn4, x_A_knn4, cs)
-            rows.append(build_result_row(
-                beta_knn4, se_knn4, sample_label, "FGLS W_bank_knn4", "W_bank_knn4",
-                lam_knn4, rho_knn4, N, T, G,
-            ))
-            if verbose:
-                print(f"  FGLS knn4:  beta={beta_knn4:.6f}  SE={se_knn4:.6f}  "
-                      f"lambda={lam_knn4:.4f}  rho(W)={rho_knn4:.4f}")
-        except Exception as exc:
-            print(f"  [SKIP] FGLS W_bank_knn4 ({sample_label}): {exc}")
+        A_knn4, rho_knn4 = build_filter(W_knn4, lam_knn4)
+        beta_knn4_vec, xi_knn4, x_A_knn4 = fgls_matrix(y, x, A_knn4)
+        beta_knn4 = float(beta_knn4_vec[0])
+        se_knn4, _ = cluster_se_matrix(xi_knn4, x_A_knn4, cs)
+        rows.append(build_result_row(
+            beta_knn4, se_knn4, sample_label, "FGLS W_bank_knn4", "W_bank_knn4",
+            lam_knn4, rho_knn4, N, T, G,
+        ))
+        if verbose:
+            print(f"  FGLS knn4:  beta={beta_knn4:.6f}  SE={se_knn4:.6f}  "
+                  f"lambda={lam_knn4:.4f}  rho(W)={rho_knn4:.4f}")
 
     # ── Hausman test: OLS vs FGLS W_bank ────────────────────────────────────
     hausman = hausman_test(beta_ols, beta_bank, se_ols, se_bank)
@@ -691,7 +685,8 @@ def make_plot(all_rows):
     )
     fig.suptitle(
         "Feasible GLS vs OLS: Credit Growth Equation\n"
-        r"$\Delta\ln(\mathrm{loans}_{b,it}) = \beta\,\mathrm{Linter\_bra}_{it}$"
+        r"$\Delta\ln(\mathrm{loans}_{b,it}) = \beta\,\mathrm{Linter\_bra}_{it}"
+        r" + \gamma^\top X_{it}$"
         " + county FE + year FE  |  State-clustered SEs",
         fontsize=10, y=1.03,
     )
@@ -739,20 +734,20 @@ def load_lambdas(output_dir):
         "full": {
             "geo" : get_sem_lam("FE W_geo (full)"),
             "bank": get_sem_lam("FE W_bank (full)"),
-            "knn3": get_sem_lam_soft("FE W_bank_knn3 (full)", "FE W_bank (full)"),
-            "knn4": get_sem_lam_soft("FE W_bank_knn4 (full)", "FE W_bank (full)"),
+            "knn3": get_sem_lam_soft("FE W_bank_knn3 (full)"),
+            "knn4": get_sem_lam_soft("FE W_bank_knn4 (full)"),
         },
         "contig": {
             "geo" : get_sem_lam("FE W_geo (contig)"),
             "bank": get_sem_lam("FE W_bank (contig)"),
-            "knn3": get_sem_lam_soft("FE W_bank_knn3 (contig)", "FE W_bank (contig)"),
-            "knn4": get_sem_lam_soft("FE W_bank_knn4 (contig)", "FE W_bank (contig)"),
+            "knn3": get_sem_lam_soft("FE W_bank_knn3 (contig)"),
+            "knn4": get_sem_lam_soft("FE W_bank_knn4 (contig)"),
         },
         "noncontig": {
             "geo" : get_sem_lam("FE W_geo (noncontig)"),
             "bank": get_sem_lam("FE W_bank (noncontig)"),
-            "knn3": get_sem_lam_soft("FE W_bank_knn3 (noncontig)", "FE W_bank (noncontig)"),
-            "knn4": get_sem_lam_soft("FE W_bank_knn4 (noncontig)", "FE W_bank (noncontig)"),
+            "knn3": get_sem_lam_soft("FE W_bank_knn3 (noncontig)"),
+            "knn4": get_sem_lam_soft("FE W_bank_knn4 (noncontig)"),
         },
     }
 
@@ -771,7 +766,8 @@ def run(output_dir=None):
     print("\nLambda values loaded from saved ML-SEM results:")
     for sample_key, d in lams.items():
         print(f"  {sample_key}: lambda_geo={d['geo']:.4f}  "
-              f"lambda_bank={d['bank']:.4f}  lambda_knn4={d['knn4']:.4f}")
+              f"lambda_bank={d['bank']:.4f}  lambda_knn3={d['knn3']}  "
+              f"lambda_knn4={d['knn4']}")
 
     # -- Load panel and spatial weight matrices --------------------------------
     co_df        = pd.read_csv(COUNTY_PATH, dtype={"fips5": str})
