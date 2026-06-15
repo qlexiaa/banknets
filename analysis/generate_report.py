@@ -285,63 +285,6 @@ LR = 2 * (logLL_alt - logLL_geo) ~ chi^2(1) under H0
     return s
 
 
-def sec_composite_credit():
-    opt = load(OUT / "composite_w_credit_optima.csv")
-    if opt is None:
-        return ""
-    s = section("3. Composite W Profile -- Credit Growth")
-
-    s += """
-**Source:** `analysis/model_selection/composite_w.py`
-
-**References:** LeSage & Pace (2009) *Introduction to Spatial Econometrics*
-
----
-
-**Profile likelihood over convex combinations of W matrices:**
-
-```
-W_combo(alpha) = alpha * W_geo + (1 - alpha) * W_alt       ...(7)
-```
-
-where alpha in {0, 0.05, 0.10, ..., 1.0} (21-point grid). For each alpha, `W_combo` is row-standardised before estimation.
-
-The model at each grid point is the same SEM as section 1, equations (1)-(2), but with `W = W_combo(alpha)`.
-
-**Optimum:** alpha* = argmax_alpha logLL(alpha)
-
-**Log-likelihood improvement:**
-```
-delta_logLL = logLL(alpha*) - max(logLL_geo, logLL_bank)     ...(8)
-```
-
-Interpretation: alpha* = 1 -> pure geographic; alpha* = 0 -> pure bank-network.
-When alpha* is at an endpoint, delta_logLL = 0 by construction (clamped).
-
-**Pairs profiled:**
-- **Pair A**: W_geo vs W_bank (continuous cosine)
-- **Pair B**: W_geo vs W_bank_count (branch-count weighted)
-- **Pair C**: W_geo vs W_bank_nonGeo (non-geographic bank links)
-
-**Optimal mixing weights:**
-
-"""
-    rows = []
-    for _, r in opt.dropna(subset=["alpha_star"]).iterrows():
-        rows.append({
-            "Pair": r["pair"],
-            "W_alt": r["w_alt"],
-            "Sample": r["sample"],
-            "alpha*": fmt(r["alpha_star"]),
-            "lambda at alpha*": f"{fmt(r['lam_at_star'])} ({fmt(r['se_lam_at_star'])})",
-            "beta at alpha*": f"{fmt(r['beta_at_star'])} ({fmt(r['se_beta_at_star'])})",
-            "delta_logLL": fmt(r["logll_improvement"], 1),
-        })
-    s += md_table(pd.DataFrame(rows))
-    s += "\n*alpha* = 1: pure W_geo; alpha* = 0: pure W_bank. delta_logLL = improvement over best single-W endpoint.*\n"
-    return s
-
-
 def sec_jtest():
     df = load(OUT / "jtest_credit_results.csv")
     if df is None:
@@ -589,11 +532,12 @@ meat = sum_s score_s^2
 Var(beta_hat_FGLS) = meat / bread^2 * G/(G-1)        ...(21)
 ```
 
-**Four estimators:**
+**Five estimators:**
 - **OLS:** A = I (no filter), lambda = 0
 - **FGLS W_geo:** lambda = lambda_hat_geo from Panel_FE_Error (section 1)
 - **FGLS W_bank:** lambda = lambda_hat_bank from Panel_FE_Error (section 1)
-- **FGLS W*:** Composite W* = 0.20*W_geo + 0.80*W_bank (Pair A optimal alpha* from section 3)
+- **FGLS W_bank_knn3:** lambda = lambda_hat_knn3 from Panel_FE_Error (falls back to lambda_bank if absent)
+- **FGLS W_bank_knn4:** lambda = lambda_hat_knn4 from Panel_FE_Error (section 1)
 
 **Hausman test** (H0: OLS = FGLS W_bank, i.e., no spatial misspecification bias):
 
@@ -1108,37 +1052,6 @@ p_perm = #{|I^pi| >= |I_obs|} / 999              ...(43)
     return s
 
 
-def sec_moran_composite():
-    df = load(DIAG / "moran_i_composite_credit_summary.csv")
-    if df is None:
-        return ""
-    s = section("17. Moran's I Under Composite W -- Credit Residuals")
-    s += """
-**Source:** `analysis/diagnostics/moran_bank_variants.py`
-
-**References:** Moran (1950); LeSage & Pace (2009)
-
----
-
-Moran's I (eq. 41) on credit SEM residuals under composite W matrices from section 3.
-A lower Moran's I at alpha* validates the composite weighting approach.
-
-**Summary:**
-
-"""
-    rows = []
-    for _, r in df.iterrows():
-        rows.append({
-            "Sample": r["sample"],
-            "W matrix": r["w_matrix"],
-            "alpha": fmt(r["alpha"]),
-            "Mean Moran's I": fmt(r["mean_moran_I"]),
-            "Sig. years": f"{safe_int(r['significant_years'])}/{safe_int(r['n_years'])}",
-        })
-    s += md_table(pd.DataFrame(rows))
-    return s
-
-
 def sec_moran_wbank():
     df = load(DIAG / "moran_i_wbank_summary.csv")
     if df is None:
@@ -1485,7 +1398,6 @@ def build_report():
     builders = [
         sec_panel_fe_credit,
         sec_four_w,
-        sec_composite_credit,
         sec_jtest,
         sec_lm_diag,
         sec_conley,
@@ -1499,7 +1411,6 @@ def build_report():
         sec_sar_multiplier,
         sec_slx,
         sec_moran_diagnostics,
-        sec_moran_composite,
         sec_moran_wbank,
         sec_bank_overlap,
         sec_w_density,

@@ -17,7 +17,7 @@ For each matrix reports:
 Matrices covered:
   W_geo, W_bank, W_bank_count, W_bank_bin, W_bank_knn4,
   W_bank_nonGeo, W_bank_interstate, W_bank_intrastate,
-  W_bank_knn_{k}  (k = 1, 2, 4, 8, 15, 20)
+  W_bank_knn_{k}  (k = 1..20, skipping k=4 which is covered by the named W_bank_knn4 row)
 
 Two additional rows are appended that describe the UN-row-standardised
 time-averaged cosine W_bank split by pair type:
@@ -50,7 +50,7 @@ ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 FDIC_PATH   = ROOT / "data" / "fdic_deposits_1994_2005.csv"
 
-KNN_SELECTED = [1, 2, 4, 8, 15, 20]
+KNN_SELECTED = [k for k in range(1, 21) if k != 4]  # k=4 is already in the named W_bank_knn4 row
 
 
 # ── Per-matrix statistics ─────────────────────────────────────────────────────
@@ -271,7 +271,6 @@ def run(output_dir=None):
         ("W_bank",            bank_vars["W_bank"]),
         ("W_bank_count",      bank_vars["W_bank_count"]),
         ("W_bank_bin",        bank_vars["W_bank_binary"]),
-        ("W_bank_knn3",       bank_vars["W_bank_knn3"]),
         ("W_bank_knn4",       bank_vars["W_bank_knn4"]),
         ("W_bank_nonGeo",     bank_vars["W_bank_nonGeo"]),
         ("W_bank_interstate", bank_vars["W_bank_interstate"]),

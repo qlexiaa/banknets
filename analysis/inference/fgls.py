@@ -1,21 +1,21 @@
 """
 fgls_comparison.py
 ==================
-Feasible GLS for the credit growth equation, comparing four estimators using
+Feasible GLS for the credit growth equation, comparing five estimators using
 state-clustered standard errors.
 
 Model: Dl_nloans_b_it = beta * Linter_bra_it + gamma * X_ct
        + county FE + year FE + eps_it
 
 Estimators (run for full and border samples):
-  1. OLS        -- Favara & Imbs (2015) baseline (no spatial correction)
-  2. FGLS W_geo -- filter A = I - lambda_geo * W_geo
-  3. FGLS W_bank-- filter A = I - lambda_bank * W_bank
-  4. FGLS W*    -- W* = 0.20*W_geo + 0.80*W_bank, lambda from composite optima
+  1. OLS             -- Favara & Imbs (2015) baseline (no spatial correction)
+  2. FGLS W_geo      -- filter A = I - lambda_geo * W_geo
+  3. FGLS W_bank     -- filter A = I - lambda_bank * W_bank
+  4. FGLS W_bank_knn3-- filter A = I - lambda_knn3 * W_bank_knn3
+  5. FGLS W_bank_knn4-- filter A = I - lambda_knn4 * W_bank_knn4
 
 Lambda values are read from saved ML-SEM results:
-  output/panel_fe_credit_results.csv    -- lambda_geo, lambda_bank
-  output/composite_w_credit_optima.csv  -- lambda* at alpha*=0.20 (Pair A)
+  output/panel_fe_credit_results.csv    -- lambda_geo, lambda_bank, lambda_knn3, lambda_knn4
 
 FGLS transformation (applied period-by-period via sparse matmul):
   y_tilde_A[t] = A @ y_tilde[t]    where A = I - lambda * W
@@ -40,7 +40,7 @@ Spectral radius check: |lambda| < 1 / rho(W) required before applying filter.
 
 Outputs:
   output/fgls_comparison.csv   -- beta, SE, CI, t-stat, p-value for each estimator
-  output/fgls_comparison.png   -- coefficient plot (4 estimators × 2 samples)
+  output/fgls_comparison.png   -- coefficient plot (5 estimators × 3 samples)
 """
 import warnings
 warnings.filterwarnings("ignore")
@@ -76,7 +76,6 @@ ESTIMATOR_LABELS = [
     "FGLS $W_{\\rm bank}$",
     "FGLS $W_{\\rm bank,knn3}$",
     "FGLS $W_{\\rm bank,knn4}$",
-    "FGLS $W^*$ (composite)",
 ]
 
 _COLORS = {
@@ -85,7 +84,6 @@ _COLORS = {
     "FGLS W_bank":            "#d01c8b",
     "FGLS W_bank_knn3":       "#a6cee3",
     "FGLS W_bank_knn4":       "#b2df8a",
-    "FGLS W* (composite)":    "#e66101",
 }
 
 
@@ -435,10 +433,10 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all,
 # Run all four estimators for one sample
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_sample(s, sample_label, lam_geo, lam_bank, lam_knn3, lam_knn4, lam_star,
+def run_sample(s, sample_label, lam_geo, lam_bank, lam_knn3, lam_knn4,
                verbose=True):
     """
-    Run OLS + five FGLS estimators for one sample dict.
+    Run OLS + four FGLS estimators for one sample dict.
 
     Parameters
     ----------
@@ -448,7 +446,6 @@ def run_sample(s, sample_label, lam_geo, lam_bank, lam_knn3, lam_knn4, lam_star,
     lam_bank     : float  lambda for W_bank filter
     lam_knn3     : float or None  lambda for W_bank_knn3 filter
     lam_knn4     : float or None  lambda for W_bank_knn4 filter
-    lam_star     : float  lambda for composite W* filter
     verbose      : bool
 
     Returns
@@ -544,21 +541,6 @@ def run_sample(s, sample_label, lam_geo, lam_bank, lam_knn3, lam_knn4, lam_star,
         except Exception as exc:
             print(f"  [SKIP] FGLS W_bank_knn4 ({sample_label}): {exc}")
 
-    # ── 4. FGLS composite W* ────────────────────────────────────────────────
-    alpha = 0.20
-    W_star = row_standardize(alpha * W_geo + (1.0 - alpha) * W_bank)
-    A_star, rho_star = build_filter(W_star, lam_star)
-    beta_star_vec, xi_star, x_A_star = fgls_matrix(y, x, A_star)
-    beta_star = float(beta_star_vec[0])
-    se_star, _ = cluster_se_matrix(xi_star, x_A_star, cs)
-    rows.append(build_result_row(
-        beta_star, se_star, sample_label, "FGLS W* (composite)", "W_star",
-        lam_star, rho_star, N, T, G,
-    ))
-    if verbose:
-        print(f"  FGLS W*:    beta={beta_star:.6f}  SE={se_star:.6f}  "
-              f"lambda={lam_star:.4f}  rho(W)={rho_star:.4f}")
-
     # ── Hausman test: OLS vs FGLS W_bank ────────────────────────────────────
     hausman = hausman_test(beta_ols, beta_bank, se_ols, se_bank)
     if verbose:
@@ -634,7 +616,7 @@ def print_table(rows, hausman, moran, sample_label):
 # Publication-quality coefficient plot
 # ══════════════════════════════════════════════════════════════════════════════
 
-_PLOT_COLORS = ["#2166ac", "#4dac26", "#d01c8b", "#a6cee3", "#b2df8a", "#e66101"]
+_PLOT_COLORS = ["#2166ac", "#4dac26", "#d01c8b", "#a6cee3", "#b2df8a"]
 _PLOT_ESTIMATORS = list(_COLORS.keys())
 _SHORT_LABELS = [
     "OLS",
@@ -642,7 +624,6 @@ _SHORT_LABELS = [
     "FGLS\n$W_{\\rm bank}$",
     "FGLS\n$W_{\\rm knn3}$",
     "FGLS\n$W_{\\rm knn4}$",
-    "FGLS\n$W^*$",
 ]
 
 
@@ -728,18 +709,15 @@ def load_lambdas(output_dir):
 
     Returns dict:
       {
-        'full':      {'geo': float, 'bank': float, 'knn4': float, 'star': float},
+        'full':      {'geo': float, 'bank': float, 'knn3': float, 'knn4': float},
         'contig':    {...},
         'noncontig': {...},
       }
-    knn4 lambda falls back to bank lambda if W_bank_knn4 rows are absent
-    (e.g., when sem_credit.py has not yet been run with knn4 included).
+    knn3/knn4 lambdas fall back to bank lambda if their rows are absent
+    (e.g., when sem_credit.py has not yet been run with those variants).
     """
     sem_path = output_dir / "panel_fe_credit_results.csv"
-    opt_path = output_dir / "composite_w_credit_optima.csv"
-
-    sem  = pd.read_csv(sem_path)
-    opt  = pd.read_csv(opt_path)
+    sem      = pd.read_csv(sem_path)
 
     def get_sem_lam(model_str):
         row = sem[sem["model"] == model_str]
@@ -752,15 +730,10 @@ def load_lambdas(output_dir):
         if len(row) == 0:
             if fallback_model is not None:
                 print(f"  [WARN] '{model_str}' not in SEM results; "
-                      f"using '{fallback_model}' lambda as proxy for knn4.")
+                      f"using '{fallback_model}' lambda as fallback.")
                 return get_sem_lam(fallback_model)
             return None
         return float(row["lam"].iloc[0])
-
-    def get_opt_lam(pair, sample):
-        row = opt[(opt["pair"] == pair) & (opt["sample"] == sample)]
-        assert len(row) == 1, f"pair='{pair}', sample='{sample}' not in {opt_path}"
-        return float(row["lam_at_star"].iloc[0])
 
     return {
         "full": {
@@ -768,21 +741,18 @@ def load_lambdas(output_dir):
             "bank": get_sem_lam("FE W_bank (full)"),
             "knn3": get_sem_lam_soft("FE W_bank_knn3 (full)", "FE W_bank (full)"),
             "knn4": get_sem_lam_soft("FE W_bank_knn4 (full)", "FE W_bank (full)"),
-            "star": get_opt_lam("Pair A", "Full"),
         },
         "contig": {
             "geo" : get_sem_lam("FE W_geo (contig)"),
             "bank": get_sem_lam("FE W_bank (contig)"),
             "knn3": get_sem_lam_soft("FE W_bank_knn3 (contig)", "FE W_bank (contig)"),
             "knn4": get_sem_lam_soft("FE W_bank_knn4 (contig)", "FE W_bank (contig)"),
-            "star": get_opt_lam("Pair A", "Contig"),
         },
         "noncontig": {
             "geo" : get_sem_lam("FE W_geo (noncontig)"),
             "bank": get_sem_lam("FE W_bank (noncontig)"),
             "knn3": get_sem_lam_soft("FE W_bank_knn3 (noncontig)", "FE W_bank (noncontig)"),
             "knn4": get_sem_lam_soft("FE W_bank_knn4 (noncontig)", "FE W_bank (noncontig)"),
-            "star": get_opt_lam("Pair A", "NonContig"),
         },
     }
 
@@ -801,7 +771,7 @@ def run(output_dir=None):
     print("\nLambda values loaded from saved ML-SEM results:")
     for sample_key, d in lams.items():
         print(f"  {sample_key}: lambda_geo={d['geo']:.4f}  "
-              f"lambda_bank={d['bank']:.4f}  lambda*={d['star']:.4f}")
+              f"lambda_bank={d['bank']:.4f}  lambda_knn4={d['knn4']:.4f}")
 
     # -- Load panel and spatial weight matrices --------------------------------
     co_df        = pd.read_csv(COUNTY_PATH, dtype={"fips5": str})
@@ -848,7 +818,7 @@ def run(output_dir=None):
         rows, hausman, moran = run_sample(
             s, slabel,
             lam_geo=d["geo"], lam_bank=d["bank"],
-            lam_knn3=d["knn3"], lam_knn4=d["knn4"], lam_star=d["star"],
+            lam_knn3=d["knn3"], lam_knn4=d["knn4"],
             verbose=True,
         )
 
