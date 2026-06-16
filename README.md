@@ -16,13 +16,25 @@ The core comparison is between seven spatial weight specifications:
 - `W_bank_interstate`: cross-state bank links only
 - `W_bank_intrastate`: within-state bank links only
 
+The credit-growth mean equation follows Favara & Imbs (2015), equation (1):
+
+```text
+Dl_nloans_b_it = beta * Linter_bra_it + gamma * X_ct
+                 + county FE + year FE + spatial error
+```
+
+`X_ct` is defined once in `analysis/panel_data.py` as `CREDIT_CONTROLS`:
+`LDl_nloans_b`, `Dl_inc`, `LDl_inc`, `Dl_pop`, `LDl_pop`, `Dl_hpi`,
+`LDl_hpi`, `Dl_her_v`, and `LDl_her_v`. Placebo loan regressions use the
+same controls except the lagged dependent variable is `LDl_nloans_pl`.
+
 ## Repository Layout
 
 ```text
 analysis/
   run_all.py                         Active 18-step analysis pipeline
   utils.py                           Weight-matrix helpers and spreg compatibility patch
-  panel_data.py                      Shared credit-panel loading, get_samples(), placebo loader
+  panel_data.py                      Shared credit-panel loading, control lists, samples, placebo loader
   generate_report.py                 Builds output/results_report.md from CSV outputs
   w_variants.py                      Centralised W matrix catalogue (all 7 bank variants)
 

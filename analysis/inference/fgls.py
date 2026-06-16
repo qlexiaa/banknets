@@ -1,20 +1,21 @@
 """
 fgls_comparison.py
 ==================
-Feasible GLS for the credit growth equation, comparing four estimators using
+Feasible GLS for the credit growth equation, comparing five estimators using
 state-clustered standard errors.
 
-Model: Dl_nloans_b_it = beta * Linter_bra_it + county FE + year FE + eps_it
+Model: Dl_nloans_b_it = beta * Linter_bra_it + gamma * X_ct
+       + county FE + year FE + eps_it
 
 Estimators (run for full and border samples):
-  1. OLS        -- Favara & Imbs (2015) baseline (no spatial correction)
-  2. FGLS W_geo -- filter A = I - lambda_geo * W_geo
-  3. FGLS W_bank-- filter A = I - lambda_bank * W_bank
-  4. FGLS W*    -- W* = 0.20*W_geo + 0.80*W_bank, lambda from composite optima
+  1. OLS             -- Favara & Imbs (2015) baseline (no spatial correction)
+  2. FGLS W_geo      -- filter A = I - lambda_geo * W_geo
+  3. FGLS W_bank     -- filter A = I - lambda_bank * W_bank
+  4. FGLS W_bank_knn3-- filter A = I - lambda_knn3 * W_bank_knn3
+  5. FGLS W_bank_knn4-- filter A = I - lambda_knn4 * W_bank_knn4
 
 Lambda values are read from saved ML-SEM results:
-  output/panel_fe_credit_results.csv    -- lambda_geo, lambda_bank
-  output/composite_w_credit_optima.csv  -- lambda* at alpha*=0.20 (Pair A)
+  output/panel_fe_credit_results.csv    -- lambda_geo, lambda_bank, lambda_knn3, lambda_knn4
 
 FGLS transformation (applied period-by-period via sparse matmul):
   y_tilde_A[t] = A @ y_tilde[t]    where A = I - lambda * W
@@ -39,7 +40,7 @@ Spectral radius check: |lambda| < 1 / rho(W) required before applying filter.
 
 Outputs:
   output/fgls_comparison.csv   -- beta, SE, CI, t-stat, p-value for each estimator
-  output/fgls_comparison.png   -- coefficient plot (4 estimators × 2 samples)
+  output/fgls_comparison.png   -- coefficient plot (5 estimators × 3 samples)
 """
 import warnings
 warnings.filterwarnings("ignore")
@@ -61,25 +62,28 @@ from scipy.sparse.linalg import eigs as sp_eigs
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa: applies spreg patch
 from utils import row_standardize, sparse_to_pysal_w
-from panel_data import load_panel_with_credit
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit
 from w_variants import load_w_geo, load_bank_variants
 
 ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 DV          = "Dl_nloans_b"
+X_VARS      = ["Linter_bra"] + CREDIT_CONTROLS
 
 ESTIMATOR_LABELS = [
     "OLS (Favara-Imbs)",
     "FGLS $W_{\\rm geo}$",
     "FGLS $W_{\\rm bank}$",
-    "FGLS $W^*$ (composite)",
+    "FGLS $W_{\\rm bank,knn3}$",
+    "FGLS $W_{\\rm bank,knn4}$",
 ]
 
 _COLORS = {
     "OLS (Favara-Imbs)":      "#2166ac",
     "FGLS W_geo":             "#4dac26",
     "FGLS W_bank":            "#d01c8b",
-    "FGLS W* (composite)":    "#e66101",
+    "FGLS W_bank_knn3":       "#a6cee3",
+    "FGLS W_bank_knn4":       "#b2df8a",
 }
 
 
@@ -140,6 +144,13 @@ def apply_filter(arr_TN, A_sp):
     Returns (T, N) array where arr_A[t] = A @ arr_TN[t].
     Uses scipy sparse mat-vec for efficiency: O(T * nnz(A)).
     """
+    if arr_TN.ndim == 3:
+        T, N, K = arr_TN.shape
+        out = np.empty_like(arr_TN)
+        for t in range(T):
+            out[t] = A_sp @ arr_TN[t]
+        return out
+
     T, N = arr_TN.shape
     out  = np.empty_like(arr_TN)
     for t in range(T):
@@ -169,54 +180,38 @@ def build_filter(W_sp, lam):
 # OLS scalar
 # ══════════════════════════════════════════════════════════════════════════════
 
-def ols_scalar(y_TN, x_TN):
-    """
-    OLS for a scalar regressor (k=1) given (T, N) within-transformed arrays.
-
-    beta = (x_A' x_A)^{-1} x_A' y_A    [here x_A = x, y_A = y, no filter]
-    xi   = y - x * beta                 [residuals in original space]
-
-    Returns (beta float, xi_TN (T,N), bread float).
-    """
-    x_f   = x_TN.flatten()
-    y_f   = y_TN.flatten()
-    bread = float(x_f @ x_f)
-    beta  = float(x_f @ y_f) / bread
-    xi    = (y_TN - beta * x_TN)       # (T, N) unfiltered residuals
-    return beta, xi, bread
+def _fit_matrix(y_TN, X_TNK):
+    """OLS for a controlled within-transformed design matrix."""
+    T, N, K = X_TNK.shape
+    X_f = X_TNK.reshape(T * N, K)
+    y_f = y_TN.reshape(T * N)
+    XtX_inv = np.linalg.inv(X_f.T @ X_f)
+    beta = XtX_inv @ (X_f.T @ y_f)
+    return beta, XtX_inv
 
 
-def fgls_scalar(y_TN, x_TN, A_sp):
-    """
-    FGLS for a scalar regressor: applies filter A period-by-period then OLS.
+def ols_matrix(y_TN, X_TNK):
+    beta, _ = _fit_matrix(y_TN, X_TNK)
+    xi = y_TN - np.einsum("tnk,k->tn", X_TNK, beta)
+    return beta, xi
 
-    y_A  = A @ y_TN[t]  for each t  [filtered DV]
-    x_A  = A @ x_TN[t]  for each t  [filtered regressor]
-    beta = (x_A' x_A)^{-1} x_A' y_A
-    xi   = y_TN - x_TN * beta         [UNFILTERED residuals per user spec]
 
-    Returns (beta float, xi_TN (T,N) unfiltered, x_A_TN (T,N) filtered,
-             bread_A float).
-    """
-    y_A   = apply_filter(y_TN, A_sp)         # (T, N) filtered DV
-    x_A   = apply_filter(x_TN, A_sp)         # (T, N) filtered regressor
-
-    x_A_f = x_A.flatten()
-    y_A_f = y_A.flatten()
-    bread = float(x_A_f @ x_A_f)             # x_A' x_A  (scalar)
-    beta  = float(x_A_f @ y_A_f) / bread     # FGLS point estimate
-
-    xi    = y_TN - beta * x_TN               # (T, N) UNFILTERED residuals
-    return beta, xi, x_A, bread
+def fgls_matrix(y_TN, X_TNK, A_sp):
+    """FGLS with the spatial filter applied to every regressor column."""
+    y_A = apply_filter(y_TN, A_sp)
+    X_A = apply_filter(X_TNK, A_sp)
+    beta, _ = _fit_matrix(y_A, X_A)
+    xi = y_TN - np.einsum("tnk,k->tn", X_TNK, beta)
+    return beta, xi, X_A
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # State-clustered SE (scalar k=1, mixed bread/meat)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def cluster_se_scalar(xi_TN, x_A_TN, county_states):
+def cluster_se_matrix(xi_TN, X_A_TNK, county_states, param_idx=0):
     """
-    State-clustered sandwich SE for scalar FGLS/OLS estimator (k=1).
+    State-clustered sandwich SE for one coefficient in the controlled model.
 
     Var(beta) = meat / bread^2 * G/(G-1)
     where:
@@ -235,21 +230,24 @@ def cluster_se_scalar(xi_TN, x_A_TN, county_states):
     se : float
     G  : int  (number of unique states)
     """
-    bread   = float((x_A_TN.flatten() ** 2).sum())
+    T, N, K = X_A_TNK.shape
+    X_f = X_A_TNK.reshape(T * N, K)
+    XtX_inv = np.linalg.inv(X_f.T @ X_f)
 
     # Mixed score: filtered regressor × unfiltered residual
-    scores  = (x_A_TN * xi_TN).sum(axis=0)     # (N,) sum over T
+    scores  = (X_A_TNK * xi_TN[:, :, None]).sum(axis=0)     # (N,K)
 
     states  = np.unique(county_states)
     G       = len(states)
-    meat    = 0.0
+    meat    = np.zeros((K, K))
     for s in states:
         mask = (county_states == s)
-        meat += float(scores[mask].sum()) ** 2
+        score_s = scores[mask].sum(axis=0)
+        meat += np.outer(score_s, score_s)
 
     df_corr = G / (G - 1)
-    var     = meat / (bread ** 2) * df_corr
-    se      = float(np.sqrt(max(var, 0.0)))
+    vcv     = XtX_inv @ meat @ XtX_inv * df_corr
+    se      = float(np.sqrt(max(vcv[param_idx, param_idx], 0.0)))
     return se, G
 
 
@@ -356,28 +354,32 @@ def moran_by_year(xi_TN, W_bank_sub, YEARS):
 # Sample builder
 # ══════════════════════════════════════════════════════════════════════════════
 
-def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos):
+def build_sample(panel_sub, county_order, W_geo_all, W_bank_all,
+                 W_knn3_all, W_knn4_all, YEARS, year_pos):
     """
     Build all inputs for FGLS comparison for one sample.
 
     County filter: same as panel_fe_credit.build_arrays
       - County present in panel_sub
-      - No any-NaN in Dl_nloans_b (balanced panel)
+      - No any-NaN in Dl_nloans_b or controlled regressors
 
     W submatrices are re-row-standardised after subsetting (necessary for
     correct spectral radius = 1 and proper FGLS filter properties).
 
     Returns dict with:
       N, T, NT, YEARS
-      y_TN, x_TN           -- (T, N) within-transformed DV and Linter_bra
-      county_states         -- (N,) integer state ID
-      W_geo_sub, W_bank_sub -- (N, N) sparse, row-standardised
-      usable                -- list of fips5 in column order
+      y_TN, x_TN                    -- (T, N) DV and (T, N, K) controlled X
+      county_states                  -- (N,) integer state ID
+      W_geo_sub, W_bank_sub,
+      W_knn3_sub, W_knn4_sub         -- (N, N) sparse, row-standardised
+      usable                         -- list of fips5 in column order
     """
     T = len(YEARS)
 
     # -- County filter ---------------------------------------------------------
-    any_nan    = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+    any_nan    = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
+        lambda g: g.isna().any().any()
+    )
     sub_co     = set(panel_sub["fips5"].unique())
     usable     = [c for c in county_order
                   if c in sub_co and not any_nan.get(c, True)]
@@ -389,11 +391,11 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
                   c_idx=lambda d: d["fips5"].map(usable_pos))
           .sort_values(["t_idx", "c_idx"]))
 
-    y_flat  = df[DV].values.astype(np.float64)
-    lb_flat = df["Linter_bra"].values.astype(np.float64)
+    y_flat = df[DV].values.astype(np.float64)
+    X_flat = df[X_VARS].values.astype(np.float64)
 
-    assert not np.isnan(y_flat).any(),  f"NaN in {DV}"
-    assert not np.isnan(lb_flat).any(), "NaN in Linter_bra"
+    assert not np.isnan(y_flat).any(), f"NaN in {DV}"
+    assert not np.isnan(X_flat).any(), "NaN in controlled X"
     assert len(y_flat) == N * T
 
     # -- State mapping ---------------------------------------------------------
@@ -405,19 +407,24 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
     )
 
     # -- Two-way within transformation ----------------------------------------
+    K = len(X_VARS)
     y_TN = two_way_within(y_flat.reshape(T, N))   # (T, N)
-    x_TN = two_way_within(lb_flat.reshape(T, N))  # (T, N)
+    X_raw = X_flat.reshape(T, N, K)
+    x_TN = np.stack([two_way_within(X_raw[:, :, j]) for j in range(K)], axis=2)
 
     # -- W submatrices (re-row-standardised after subsetting) -----------------
     idx        = np.array([county_order.index(c) for c in usable])
     W_geo_sub  = row_standardize(W_geo_all[idx, :][:, idx])
     W_bank_sub = row_standardize(W_bank_all[idx, :][:, idx])
+    W_knn3_sub = row_standardize(W_knn3_all[idx, :][:, idx])
+    W_knn4_sub = row_standardize(W_knn4_all[idx, :][:, idx])
 
     return dict(
         N=N, T=T, NT=N * T, YEARS=YEARS,
         y_TN=y_TN, x_TN=x_TN,
         county_states=county_states,
         W_geo_sub=W_geo_sub, W_bank_sub=W_bank_sub,
+        W_knn3_sub=W_knn3_sub, W_knn4_sub=W_knn4_sub,
         usable=usable,
     )
 
@@ -426,17 +433,19 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all, YEARS, year_pos
 # Run all four estimators for one sample
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_sample(s, sample_label, lam_geo, lam_bank, lam_star, verbose=True):
+def run_sample(s, sample_label, lam_geo, lam_bank, lam_knn3, lam_knn4,
+               verbose=True):
     """
-    Run OLS + three FGLS estimators for one sample dict.
+    Run OLS + four FGLS estimators for one sample dict.
 
     Parameters
     ----------
     s            : dict from build_sample()
-    sample_label : str  ('Full' or 'Border')
+    sample_label : str
     lam_geo      : float  lambda for W_geo filter
     lam_bank     : float  lambda for W_bank filter
-    lam_star     : float  lambda for composite W* filter
+    lam_knn3     : float or None  lambda for W_bank_knn3 filter
+    lam_knn4     : float or None  lambda for W_bank_knn4 filter
     verbose      : bool
 
     Returns
@@ -451,12 +460,15 @@ def run_sample(s, sample_label, lam_geo, lam_bank, lam_star, verbose=True):
     cs = s["county_states"]
     W_geo  = s["W_geo_sub"]
     W_bank = s["W_bank_sub"]
+    W_knn3 = s["W_knn3_sub"]
+    W_knn4 = s["W_knn4_sub"]
 
     rows   = []
 
     # ── 1. OLS (no filter, x_A = x_tilde) ──────────────────────────────────
-    beta_ols, xi_ols, bread_ols = ols_scalar(y, x)
-    se_ols, G = cluster_se_scalar(xi_ols, x, cs)
+    beta_ols_vec, xi_ols = ols_matrix(y, x)
+    beta_ols = float(beta_ols_vec[0])
+    se_ols, G = cluster_se_matrix(xi_ols, x, cs)
     rows.append(build_result_row(
         beta_ols, se_ols, sample_label, "OLS (Favara-Imbs)", "none",
         0.0, 0.0, N, T, G,
@@ -471,8 +483,9 @@ def run_sample(s, sample_label, lam_geo, lam_bank, lam_star, verbose=True):
 
     # ── 2. FGLS W_geo ───────────────────────────────────────────────────────
     A_geo, rho_geo = build_filter(W_geo, lam_geo)
-    beta_geo, xi_geo, x_A_geo, _ = fgls_scalar(y, x, A_geo)
-    se_geo, _ = cluster_se_scalar(xi_geo, x_A_geo, cs)
+    beta_geo_vec, xi_geo, x_A_geo = fgls_matrix(y, x, A_geo)
+    beta_geo = float(beta_geo_vec[0])
+    se_geo, _ = cluster_se_matrix(xi_geo, x_A_geo, cs)
     rows.append(build_result_row(
         beta_geo, se_geo, sample_label, "FGLS W_geo", "W_geo",
         lam_geo, rho_geo, N, T, G,
@@ -483,8 +496,9 @@ def run_sample(s, sample_label, lam_geo, lam_bank, lam_star, verbose=True):
 
     # ── 3. FGLS W_bank ──────────────────────────────────────────────────────
     A_bank, rho_bank = build_filter(W_bank, lam_bank)
-    beta_bank, xi_bank, x_A_bank, _ = fgls_scalar(y, x, A_bank)
-    se_bank, _ = cluster_se_scalar(xi_bank, x_A_bank, cs)
+    beta_bank_vec, xi_bank, x_A_bank = fgls_matrix(y, x, A_bank)
+    beta_bank = float(beta_bank_vec[0])
+    se_bank, _ = cluster_se_matrix(xi_bank, x_A_bank, cs)
     rows.append(build_result_row(
         beta_bank, se_bank, sample_label, "FGLS W_bank", "W_bank",
         lam_bank, rho_bank, N, T, G,
@@ -493,19 +507,33 @@ def run_sample(s, sample_label, lam_geo, lam_bank, lam_star, verbose=True):
         print(f"  FGLS W_bank:beta={beta_bank:.6f}  SE={se_bank:.6f}  "
               f"lambda={lam_bank:.4f}  rho(W)={rho_bank:.4f}")
 
-    # ── 4. FGLS composite W* ────────────────────────────────────────────────
-    alpha = 0.20
-    W_star = row_standardize(alpha * W_geo + (1.0 - alpha) * W_bank)
-    A_star, rho_star = build_filter(W_star, lam_star)
-    beta_star, xi_star, x_A_star, _ = fgls_scalar(y, x, A_star)
-    se_star, _ = cluster_se_scalar(xi_star, x_A_star, cs)
-    rows.append(build_result_row(
-        beta_star, se_star, sample_label, "FGLS W* (composite)", "W_star",
-        lam_star, rho_star, N, T, G,
-    ))
-    if verbose:
-        print(f"  FGLS W*:    beta={beta_star:.6f}  SE={se_star:.6f}  "
-              f"lambda={lam_star:.4f}  rho(W)={rho_star:.4f}")
+    # ── 3b. FGLS W_bank_knn3 ────────────────────────────────────────────────
+    if lam_knn3 is not None:
+        A_knn3, rho_knn3 = build_filter(W_knn3, lam_knn3)
+        beta_knn3_vec, xi_knn3, x_A_knn3 = fgls_matrix(y, x, A_knn3)
+        beta_knn3 = float(beta_knn3_vec[0])
+        se_knn3, _ = cluster_se_matrix(xi_knn3, x_A_knn3, cs)
+        rows.append(build_result_row(
+            beta_knn3, se_knn3, sample_label, "FGLS W_bank_knn3", "W_bank_knn3",
+            lam_knn3, rho_knn3, N, T, G,
+        ))
+        if verbose:
+            print(f"  FGLS knn3:  beta={beta_knn3:.6f}  SE={se_knn3:.6f}  "
+                  f"lambda={lam_knn3:.4f}  rho(W)={rho_knn3:.4f}")
+
+    # ── 3c. FGLS W_bank_knn4 ────────────────────────────────────────────────
+    if lam_knn4 is not None:
+        A_knn4, rho_knn4 = build_filter(W_knn4, lam_knn4)
+        beta_knn4_vec, xi_knn4, x_A_knn4 = fgls_matrix(y, x, A_knn4)
+        beta_knn4 = float(beta_knn4_vec[0])
+        se_knn4, _ = cluster_se_matrix(xi_knn4, x_A_knn4, cs)
+        rows.append(build_result_row(
+            beta_knn4, se_knn4, sample_label, "FGLS W_bank_knn4", "W_bank_knn4",
+            lam_knn4, rho_knn4, N, T, G,
+        ))
+        if verbose:
+            print(f"  FGLS knn4:  beta={beta_knn4:.6f}  SE={se_knn4:.6f}  "
+                  f"lambda={lam_knn4:.4f}  rho(W)={rho_knn4:.4f}")
 
     # ── Hausman test: OLS vs FGLS W_bank ────────────────────────────────────
     hausman = hausman_test(beta_ols, beta_bank, se_ols, se_bank)
@@ -582,12 +610,14 @@ def print_table(rows, hausman, moran, sample_label):
 # Publication-quality coefficient plot
 # ══════════════════════════════════════════════════════════════════════════════
 
-_PLOT_COLORS = ["#2166ac", "#4dac26", "#d01c8b", "#e66101"]
+_PLOT_COLORS = ["#2166ac", "#4dac26", "#d01c8b", "#a6cee3", "#b2df8a"]
+_PLOT_ESTIMATORS = list(_COLORS.keys())
 _SHORT_LABELS = [
     "OLS",
     "FGLS\n$W_{\\rm geo}$",
     "FGLS\n$W_{\\rm bank}$",
-    "FGLS\n$W^*$",
+    "FGLS\n$W_{\\rm knn3}$",
+    "FGLS\n$W_{\\rm knn4}$",
 ]
 
 
@@ -604,17 +634,26 @@ def make_plot(all_rows):
     if n_samples == 1:
         axes = [axes]
 
-    xs = np.arange(4)
+    xs = np.arange(len(_SHORT_LABELS))
+    slot_index = {estimator: idx for idx, estimator in enumerate(_PLOT_ESTIMATORS)}
+    color_lookup = {
+        estimator: _PLOT_COLORS[idx]
+        for idx, estimator in enumerate(_PLOT_ESTIMATORS)
+    }
     for ax, slabel in zip(axes, sample_labels):
         rlist = all_rows[slabel]
-        for i, r in enumerate(rlist):
-            col = _PLOT_COLORS[i]
-            ax.vlines(xs[i], r["ci_lower"], r["ci_upper"],
+        for r in rlist:
+            estimator = r["estimator"]
+            if estimator not in slot_index:
+                continue
+            x = xs[slot_index[estimator]]
+            col = color_lookup[estimator]
+            ax.vlines(x, r["ci_lower"], r["ci_upper"],
                       color=col, linewidth=2.5, zorder=3)
             ax.hlines([r["ci_lower"], r["ci_upper"]],
-                      xs[i] - 0.13, xs[i] + 0.13,
+                      x - 0.13, x + 0.13,
                       color=col, linewidth=1.5, zorder=3)
-            ax.scatter(xs[i], r["beta"],
+            ax.scatter(x, r["beta"],
                        color=col, s=55, zorder=5,
                        edgecolors="white", linewidths=0.8)
 
@@ -628,7 +667,7 @@ def make_plot(all_rows):
             fontsize=10, pad=8,
         )
         ax.spines[["top", "right"]].set_visible(False)
-        ax.set_xlim(-0.60, 3.60)
+        ax.set_xlim(-0.60, len(_SHORT_LABELS) - 0.40)
         ax.yaxis.set_major_formatter(plt.FormatStrFormatter("%.3f"))
         ax.tick_params(axis="y", labelsize=9)
 
@@ -637,7 +676,7 @@ def make_plot(all_rows):
     legend_handles = [
         Line2D([0], [0], color=_PLOT_COLORS[i], linewidth=2.5,
                marker="o", markersize=6, label=ESTIMATOR_LABELS[i])
-        for i in range(4)
+        for i in range(len(_PLOT_ESTIMATORS))
     ]
     fig.legend(
         handles=legend_handles,
@@ -646,7 +685,8 @@ def make_plot(all_rows):
     )
     fig.suptitle(
         "Feasible GLS vs OLS: Credit Growth Equation\n"
-        r"$\Delta\ln(\mathrm{loans}_{b,it}) = \beta\,\mathrm{Linter\_bra}_{it}$"
+        r"$\Delta\ln(\mathrm{loans}_{b,it}) = \beta\,\mathrm{Linter\_bra}_{it}"
+        r" + \gamma^\top X_{it}$"
         " + county FE + year FE  |  State-clustered SEs",
         fontsize=10, y=1.03,
     )
@@ -664,41 +704,50 @@ def load_lambdas(output_dir):
 
     Returns dict:
       {
-        'full':  {'geo': float, 'bank': float, 'star': float},
-        'nb':    {'geo': float, 'bank': float, 'star': float},
+        'full':      {'geo': float, 'bank': float, 'knn3': float, 'knn4': float},
+        'contig':    {...},
+        'noncontig': {...},
       }
+    knn3/knn4 lambdas fall back to bank lambda if their rows are absent
+    (e.g., when sem_credit.py has not yet been run with those variants).
     """
     sem_path = output_dir / "panel_fe_credit_results.csv"
-    opt_path = output_dir / "composite_w_credit_optima.csv"
-
-    sem  = pd.read_csv(sem_path)
-    opt  = pd.read_csv(opt_path)
+    sem      = pd.read_csv(sem_path)
 
     def get_sem_lam(model_str):
         row = sem[sem["model"] == model_str]
         assert len(row) == 1, f"model '{model_str}' not found in {sem_path}"
         return float(row["lam"].iloc[0])
 
-    def get_opt_lam(pair, sample):
-        row = opt[(opt["pair"] == pair) & (opt["sample"] == sample)]
-        assert len(row) == 1, f"pair='{pair}', sample='{sample}' not in {opt_path}"
-        return float(row["lam_at_star"].iloc[0])
+    def get_sem_lam_soft(model_str, fallback_model=None):
+        """Return lambda; fall back to fallback_model if not found."""
+        row = sem[sem["model"] == model_str]
+        if len(row) == 0:
+            if fallback_model is not None:
+                print(f"  [WARN] '{model_str}' not in SEM results; "
+                      f"using '{fallback_model}' lambda as fallback.")
+                return get_sem_lam(fallback_model)
+            return None
+        return float(row["lam"].iloc[0])
 
     return {
         "full": {
             "geo" : get_sem_lam("FE W_geo (full)"),
             "bank": get_sem_lam("FE W_bank (full)"),
-            "star": get_opt_lam("Pair A", "Full"),
+            "knn3": get_sem_lam_soft("FE W_bank_knn3 (full)"),
+            "knn4": get_sem_lam_soft("FE W_bank_knn4 (full)"),
         },
         "contig": {
             "geo" : get_sem_lam("FE W_geo (contig)"),
             "bank": get_sem_lam("FE W_bank (contig)"),
-            "star": get_opt_lam("Pair A", "Contig"),
+            "knn3": get_sem_lam_soft("FE W_bank_knn3 (contig)"),
+            "knn4": get_sem_lam_soft("FE W_bank_knn4 (contig)"),
         },
         "noncontig": {
             "geo" : get_sem_lam("FE W_geo (noncontig)"),
             "bank": get_sem_lam("FE W_bank (noncontig)"),
-            "star": get_opt_lam("Pair A", "NonContig"),
+            "knn3": get_sem_lam_soft("FE W_bank_knn3 (noncontig)"),
+            "knn4": get_sem_lam_soft("FE W_bank_knn4 (noncontig)"),
         },
     }
 
@@ -717,7 +766,8 @@ def run(output_dir=None):
     print("\nLambda values loaded from saved ML-SEM results:")
     for sample_key, d in lams.items():
         print(f"  {sample_key}: lambda_geo={d['geo']:.4f}  "
-              f"lambda_bank={d['bank']:.4f}  lambda*={d['star']:.4f}")
+              f"lambda_bank={d['bank']:.4f}  lambda_knn3={d['knn3']}  "
+              f"lambda_knn4={d['knn4']}")
 
     # -- Load panel and spatial weight matrices --------------------------------
     co_df        = pd.read_csv(COUNTY_PATH, dtype={"fips5": str})
@@ -726,8 +776,10 @@ def run(output_dir=None):
     W_geo_all, gal_order = load_w_geo(county_order)
     assert gal_order == county_order, "GAL county order mismatch"
 
-    bank_vars  = load_bank_variants(county_order, W_geo_all=W_geo_all)
-    W_bank_all = bank_vars["W_bank"]
+    bank_vars        = load_bank_variants(county_order, W_geo_all=W_geo_all)
+    W_bank_all       = bank_vars["W_bank"]
+    W_bank_knn3_all  = bank_vars["W_bank_knn3"]
+    W_bank_knn4_all  = bank_vars["W_bank_knn4"]
 
     panel = load_panel_with_credit()
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
@@ -755,13 +807,14 @@ def run(output_dir=None):
         print("  Building within-transformed arrays ...", flush=True)
 
         s = build_sample(panel_sub, county_order, W_geo_all, W_bank_all,
-                         YEARS, year_pos)
+                         W_bank_knn3_all, W_bank_knn4_all, YEARS, year_pos)
         print(f"  N={s['N']}  T={s['T']}  NT={s['NT']:,}")
 
         d = lams[lam_key]
         rows, hausman, moran = run_sample(
             s, slabel,
-            lam_geo=d["geo"], lam_bank=d["bank"], lam_star=d["star"],
+            lam_geo=d["geo"], lam_bank=d["bank"],
+            lam_knn3=d["knn3"], lam_knn4=d["knn4"],
             verbose=True,
         )
 

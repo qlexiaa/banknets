@@ -75,9 +75,9 @@ def load_lambdas():
     cr  = pd.read_csv(CREDIT_CSV)
 
     for sample_tag in ["full", "contig", "noncontig"]:
-        for w_tag in ["W_geo", "W_bank"]:
-            mask = (cr["model"].str.contains(w_tag, regex=False) &
-                    cr["model"].str.contains(f"({sample_tag})", regex=False))
+        for w_tag in ["W_geo", "W_bank", "W_bank_knn3", "W_bank_knn4"]:
+            expected_model = f"FE {w_tag} ({sample_tag})"
+            mask = cr["model"] == expected_model
             rows = cr.loc[mask, "lam"]
             if len(rows) > 0:
                 lam[("credit", w_tag, sample_tag)] = float(rows.iloc[0])
@@ -278,8 +278,15 @@ def run(output_dir=None):
     W_geo_sp, _ = load_w_geo(county_order)
     bank_vars   = load_bank_variants(county_order, W_geo_all=W_geo_sp)
     W_bank_sp   = bank_vars["W_bank"]
+    W_knn3_sp   = bank_vars["W_bank_knn3"]
+    W_knn4_sp   = bank_vars["W_bank_knn4"]
 
-    W_MATS = {"W_geo": W_geo_sp, "W_bank": W_bank_sp}
+    W_MATS = {
+        "W_geo":       W_geo_sp,
+        "W_bank":      W_bank_sp,
+        "W_bank_knn3": W_knn3_sp,
+        "W_bank_knn4": W_knn4_sp,
+    }
 
     panel = load_panel_with_credit()
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
@@ -319,12 +326,18 @@ def run(output_dir=None):
     all_hubs     = []
 
     COMBOS = [
-        ("credit", "W_geo",  "full"),
-        ("credit", "W_bank", "full"),
-        ("credit", "W_geo",  "contig"),
-        ("credit", "W_bank", "contig"),
-        ("credit", "W_geo",  "noncontig"),
-        ("credit", "W_bank", "noncontig"),
+        ("credit", "W_geo",        "full"),
+        ("credit", "W_bank",       "full"),
+        ("credit", "W_bank_knn3",  "full"),
+        ("credit", "W_bank_knn4",  "full"),
+        ("credit", "W_geo",        "contig"),
+        ("credit", "W_bank",       "contig"),
+        ("credit", "W_bank_knn3",  "contig"),
+        ("credit", "W_bank_knn4",  "contig"),
+        ("credit", "W_geo",        "noncontig"),
+        ("credit", "W_bank",       "noncontig"),
+        ("credit", "W_bank_knn3",  "noncontig"),
+        ("credit", "W_bank_knn4",  "noncontig"),
     ]
 
     for outcome, w_label, sample_tag in COMBOS:

@@ -26,6 +26,7 @@ from esda.moran import Moran
 from libpysal.weights import WSP
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
+from panel_data import CREDIT_CONTROLS  # noqa: E402
 from utils import gal_to_W, row_standardize  # noqa: E402
 
 
@@ -110,19 +111,15 @@ def load_residuals():
     print("\n" + "=" * 60)
     print("STEP 2: Credit residuals")
     print("=" * 60)
-    credit_required = [
-        "Dl_nloans_b", "Linter_bra", "LDl_nloans_b",
-        "Dl_inc", "LDl_inc", "Dl_pop", "LDl_pop",
-        "Dl_her_v", "LDl_her_v", "county", "year",
-    ]
+    credit_required = ["Dl_nloans_b", "Linter_bra"] + CREDIT_CONTROLS + ["county", "year"]
     df_credit = df.dropna(subset=credit_required).copy()
     df_credit["state"] = (
         df_credit["county"].astype(str).str.zfill(5).str[:2].astype(int)
     )
     credit_formula = (
-        "Dl_nloans_b ~ Linter_bra + LDl_nloans_b "
-        "+ Dl_inc + LDl_inc + Dl_pop + LDl_pop "
-        "+ Dl_her_v + LDl_her_v + C(county) + C(year)"
+        "Dl_nloans_b ~ Linter_bra + "
+        + " + ".join(CREDIT_CONTROLS)
+        + " + C(county) + C(year)"
     )
     credit_model = smf.ols(credit_formula, data=df_credit).fit(
         cov_type="cluster",

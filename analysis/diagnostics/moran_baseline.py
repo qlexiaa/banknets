@@ -26,6 +26,7 @@ import statsmodels.formula.api as smf
 from esda.moran import Moran
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
+from panel_data import CREDIT_CONTROLS  # noqa: E402
 
 ROOT = Path(__file__).parents[2]
 DTA_DIR = ROOT / "Replication" / "20121416_1data" / "data"
@@ -204,20 +205,16 @@ def run(output_dir=None):
     print("\n" + "=" * 60)
     print("STEP 2: Baseline credit-growth regression")
     print("=" * 60)
-    required_cols = [
-        "Dl_nloans_b", "Linter_bra", "LDl_nloans_b",
-        "Dl_inc", "LDl_inc", "Dl_pop", "LDl_pop",
-        "Dl_her_v", "LDl_her_v", "county", "year",
-    ]
+    required_cols = ["Dl_nloans_b", "Linter_bra"] + CREDIT_CONTROLS + ["county", "year"]
     df_clean = df.dropna(subset=required_cols).copy()
     df_clean["state"] = (
         df_clean["county"].astype(str).str.zfill(5).str[:2].astype(int)
     )
 
     formula = (
-        "Dl_nloans_b ~ Linter_bra + LDl_nloans_b "
-        "+ Dl_inc + LDl_inc + Dl_pop + LDl_pop "
-        "+ Dl_her_v + LDl_her_v + C(county) + C(year)"
+        "Dl_nloans_b ~ Linter_bra + "
+        + " + ".join(CREDIT_CONTROLS)
+        + " + C(county) + C(year)"
     )
     model = smf.ols(formula, data=df_clean).fit(
         cov_type="cluster",

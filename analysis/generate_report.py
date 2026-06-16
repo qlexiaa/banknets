@@ -22,9 +22,13 @@ import re
 import pandas as pd
 import numpy as np
 
+from panel_data import CREDIT_CONTROLS, PLACEBO_CONTROLS
+
 ROOT = Path(__file__).parent.parent
 OUT  = ROOT / "output"
 DIAG = OUT / "diagnostics"
+CREDIT_X_SPEC = "Linter_bra + " + " + ".join(CREDIT_CONTROLS)
+PLACEBO_X_SPEC = "Linter_bra + " + " + ".join(PLACEBO_CONTROLS)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -156,13 +160,14 @@ def sec_panel_fe_credit():
 **Structural equation (Spatial Error Model):**
 
 ```
-delta_ln(loans)_it = beta * Linter_bra_it + a_i + tau_t + u_it        ...(1)
-u_it = lambda * (W u)_it + eps_it                                      ...(2)
+delta_ln(loans)_it = beta * Linter_bra_it + gamma' X_ct + a_i + tau_t + u_it        ...(1)
+u_it = lambda * (W u)_it + eps_it                                                   ...(2)
 ```
 
 where:
 - `delta_ln(loans)_it` = log-change in commercial-bank mortgage loans (Favara-Imbs HMDA), county i, year t
 - `Linter_bra_it` = cumulative interstate branching deregulation index
+- `X_ct` = `{CREDIT_X_SPEC}`
 - `a_i` = county fixed effect; `tau_t` = year fixed effect
 - `W` = row-standardised spatial weight matrix (two variants compared)
 - `lambda` = spatial error autocorrelation parameter; `eps_it` ~ i.i.d.(0, sigma^2)
@@ -170,7 +175,7 @@ where:
 Reduced form obtained by substituting (2) into (1):
 
 ```
-delta_ln(loans)_it = beta * Linter_bra_it + a_i + tau_t + (I - lambdaW)^{-1} eps_it
+delta_ln(loans)_it = beta * Linter_bra_it + gamma' X_ct + a_i + tau_t + (I - lambdaW)^(-1) eps_it
 ```
 
 **Estimation:** Maximum likelihood via `spreg.Panel_FE_Error` (Anselin et al. 2008). Log-likelihood under normality:
@@ -277,63 +282,6 @@ LR = 2 * (logLL_alt - logLL_geo) ~ chi^2(1) under H0
         })
     s += md_table(pd.DataFrame(rows))
     s += "\n*Standard errors in parentheses. Gap is one-sided z-test (H1: lambda_alt > lambda_geo).*\n"
-    return s
-
-
-def sec_composite_credit():
-    opt = load(OUT / "composite_w_credit_optima.csv")
-    if opt is None:
-        return ""
-    s = section("3. Composite W Profile -- Credit Growth")
-
-    s += """
-**Source:** `analysis/model_selection/composite_w.py`
-
-**References:** LeSage & Pace (2009) *Introduction to Spatial Econometrics*
-
----
-
-**Profile likelihood over convex combinations of W matrices:**
-
-```
-W_combo(alpha) = alpha * W_geo + (1 - alpha) * W_alt       ...(7)
-```
-
-where alpha in {0, 0.05, 0.10, ..., 1.0} (21-point grid). For each alpha, `W_combo` is row-standardised before estimation.
-
-The model at each grid point is the same SEM as section 1, equations (1)-(2), but with `W = W_combo(alpha)`.
-
-**Optimum:** alpha* = argmax_alpha logLL(alpha)
-
-**Log-likelihood improvement:**
-```
-delta_logLL = logLL(alpha*) - max(logLL_geo, logLL_bank)     ...(8)
-```
-
-Interpretation: alpha* = 1 -> pure geographic; alpha* = 0 -> pure bank-network.
-When alpha* is at an endpoint, delta_logLL = 0 by construction (clamped).
-
-**Pairs profiled:**
-- **Pair A**: W_geo vs W_bank (continuous cosine)
-- **Pair B**: W_geo vs W_bank_count (branch-count weighted)
-- **Pair C**: W_geo vs W_bank_nonGeo (non-geographic bank links)
-
-**Optimal mixing weights:**
-
-"""
-    rows = []
-    for _, r in opt.dropna(subset=["alpha_star"]).iterrows():
-        rows.append({
-            "Pair": r["pair"],
-            "W_alt": r["w_alt"],
-            "Sample": r["sample"],
-            "alpha*": fmt(r["alpha_star"]),
-            "lambda at alpha*": f"{fmt(r['lam_at_star'])} ({fmt(r['se_lam_at_star'])})",
-            "beta at alpha*": f"{fmt(r['beta_at_star'])} ({fmt(r['se_beta_at_star'])})",
-            "delta_logLL": fmt(r["logll_improvement"], 1),
-        })
-    s += md_table(pd.DataFrame(rows))
-    s += "\n*alpha* = 1: pure W_geo; alpha* = 0: pure W_bank. delta_logLL = improvement over best single-W endpoint.*\n"
     return s
 
 
@@ -465,8 +413,10 @@ def sec_conley():
 **Model** (same point estimate beta across all four estimators):
 
 ```
-delta_ln(loans)_tilde_it = beta * L_tilde_inter_bra_it + u_tilde_it     (two-way FE OLS)
+delta_ln(loans)_tilde_it = beta * L_tilde_inter_bra_it + gamma' X_tilde_ct + u_tilde_it
 ```
+
+Controlled X matrix: `{CREDIT_X_SPEC}`.
 
 **General sandwich variance** (White 1980):
 
@@ -552,8 +502,10 @@ def sec_fgls():
 **Model:**
 
 ```
-delta_ln(loans)_it = beta * Linter_bra_it + a_i + tau_t + eps_it
+delta_ln(loans)_it = beta * Linter_bra_it + gamma' X_ct + a_i + tau_t + eps_it
 ```
+
+Controlled X matrix: `{CREDIT_X_SPEC}`.
 
 **Spatial filter** (applied period-by-period):
 
@@ -580,11 +532,12 @@ meat = sum_s score_s^2
 Var(beta_hat_FGLS) = meat / bread^2 * G/(G-1)        ...(21)
 ```
 
-**Four estimators:**
+**Five estimators:**
 - **OLS:** A = I (no filter), lambda = 0
 - **FGLS W_geo:** lambda = lambda_hat_geo from Panel_FE_Error (section 1)
 - **FGLS W_bank:** lambda = lambda_hat_bank from Panel_FE_Error (section 1)
-- **FGLS W*:** Composite W* = 0.20*W_geo + 0.80*W_bank (Pair A optimal alpha* from section 3)
+- **FGLS W_bank_knn3:** lambda = lambda_hat_knn3 from Panel_FE_Error (falls back to lambda_bank if absent)
+- **FGLS W_bank_knn4:** lambda = lambda_hat_knn4 from Panel_FE_Error (section 1)
 
 **Hausman test** (H0: OLS = FGLS W_bank, i.e., no spatial misspecification bias):
 
@@ -643,8 +596,10 @@ def sec_sar_robustness():
 **SAR (Spatial Lag) model:**
 
 ```
-delta_ln(loans)_it = rho * (W delta_ln(loans))_it + beta * Linter_bra_it + a_i + tau_t + u_it    ...(24)
+delta_ln(loans)_it = rho * (W delta_ln(loans))_it + beta * Linter_bra_it + gamma' X_ct + a_i + tau_t + u_it    ...(24)
 ```
+
+Controlled X matrix: `{CREDIT_X_SPEC}`.
 
 Estimated via `spreg.Panel_FE_Lag`, which instruments `Wy` internally using spatial lags of the exogenous regressors (Kelejian & Prucha 1998).
 
@@ -1002,12 +957,13 @@ where `D = Linter_bra` (state-level deregulation index) and `w^{interstate}` is 
 **Regression specifications** (two-way county + year FE, within estimator):
 
 ```
-(1) Base:    delta_ln(loans)_it = beta_D * D_it + eps_it
-(2) SLX:     delta_ln(loans)_it = beta_D * D_it + beta_E * E_it + eps_it     ...(38)
-(3) Placebo: delta_ln(loans_pl)_it = beta_D * D_it + beta_E * E_it + eps_it
+(1) Base:    delta_ln(loans)_it = beta_D * D_it + gamma' X_ct + eps_it
+(2) SLX:     delta_ln(loans)_it = beta_D * D_it + gamma' X_ct + beta_E * E_it + eps_it     ...(38)
+(3) Placebo: delta_ln(loans_pl)_it = beta_D * D_it + gamma' X_pl,ct + beta_E * E_it + eps_it
 ```
 
-where `loans_pl` = non-bank mortgage lending.
+where `loans_pl` = non-bank mortgage lending, `X_ct` = `{CREDIT_X_SPEC}`,
+and `X_pl,ct` = `{PLACEBO_X_SPEC}`.
 
 **Permutation test** for beta_E (999 permutations, seed=42):
 
@@ -1093,37 +1049,6 @@ p_perm = #{|I^pi| >= |I_obs|} / 999              ...(43)
                "p": pval_str(r["p_value"]), "Sig": "Y" if r["significant"] else ""}
              for _, r in sub.iterrows()]
     s += md_table(pd.DataFrame(rows2))
-    return s
-
-
-def sec_moran_composite():
-    df = load(DIAG / "moran_i_composite_credit_summary.csv")
-    if df is None:
-        return ""
-    s = section("17. Moran's I Under Composite W -- Credit Residuals")
-    s += """
-**Source:** `analysis/diagnostics/moran_bank_variants.py`
-
-**References:** Moran (1950); LeSage & Pace (2009)
-
----
-
-Moran's I (eq. 41) on credit SEM residuals under composite W matrices from section 3.
-A lower Moran's I at alpha* validates the composite weighting approach.
-
-**Summary:**
-
-"""
-    rows = []
-    for _, r in df.iterrows():
-        rows.append({
-            "Sample": r["sample"],
-            "W matrix": r["w_matrix"],
-            "alpha": fmt(r["alpha"]),
-            "Mean Moran's I": fmt(r["mean_moran_I"]),
-            "Sig. years": f"{safe_int(r['significant_years'])}/{safe_int(r['n_years'])}",
-        })
-    s += md_table(pd.DataFrame(rows))
     return s
 
 
@@ -1234,31 +1159,223 @@ Density statistics for every W matrix used in the analysis pipeline.
 
 - **N**: number of counties (rows)
 - **nnz**: non-zero off-diagonal entries
-- **density_pct**: 100 * nnz / (N*(N-1))
-- **mean_nbrs / median_nbrs**: average / median off-diagonal connections per county
-- **pct_isolated**: % of rows with zero off-diagonal weight
+- **density %**: 100 * nnz / (N*(N-1))
+- **mean nbrs / median nbrs**: average / median off-diagonal connections per county
+- **% isolated**: % of rows with zero off-diagonal weight
+- **mean w / median w**: mean and median value of non-zero off-diagonal entries.
+  For row-standardised matrices these reflect the typical weight per active
+  neighbour.  The two special rows at the bottom use the **UN-row-standardised**
+  time-averaged cosine W_bank split by pair type, so their mean w / median w are
+  raw cosine similarity scores directly comparable as bank-portfolio overlap.
 
 **Results:**
 
 """
-    rows = []
-    for _, r in df.iterrows():
-        rows.append({
-            "Matrix": r["matrix"],
-            "N": safe_int(r["N"]),
-            "nnz": safe_int(r["nnz"]),
-            "density %": fmt(r["density_pct"], 4),
-            "mean nbrs": fmt(r["mean_nbrs"], 2),
+    STATE_LABELS = {"W_bank same-state entries", "W_bank cross-state entries"}
+    std_rows   = df[~df["matrix"].isin(STATE_LABELS)]
+    split_rows = df[df["matrix"].isin(STATE_LABELS)]
+
+    def _density_row(r):
+        return {
+            "Matrix":      r["matrix"],
+            "N":           safe_int(r["N"]),
+            "nnz":         safe_int(r.get("nnz", np.nan)),
+            "density %":   fmt(r["density_pct"], 4),
+            "mean nbrs":   fmt(r["mean_nbrs"], 2),
             "median nbrs": fmt(r["median_nbrs"], 2),
-            "% isolated": fmt(r["pct_isolated"], 1),
-        })
-    s += md_table(pd.DataFrame(rows))
+            "% isolated":  fmt(r["pct_isolated"], 1),
+            "mean w":      fmt(r.get("mean_nonzero_weight",   np.nan)),
+            "median w":    fmt(r.get("median_nonzero_weight", np.nan)),
+        }
+
+    s += md_table(pd.DataFrame([_density_row(r) for _, r in std_rows.iterrows()]))
+
+    if not split_rows.empty:
+        s += """
+**Raw cosine W_bank: weight distribution by pair type**
+*(density % = nnz / total eligible pairs of that type; mean w / median w are*
+*raw un-standardised cosine similarity values)*
+
+"""
+        s += md_table(pd.DataFrame([_density_row(r) for _, r in split_rows.iterrows()]))
+        s += ("\n*Same-state entries tend to have higher raw cosine similarity "
+              "because intra-state banks share overlapping branch footprints. "
+              "Cross-state entries isolate the post-IBBEA deregulation channel.*\n")
+
     return s
 
 
 # ── Preserved (not in active builders) ────────────────────────────────────────
 # sec_sar_iv        -- deprecated (see output/deprecated/sar_iv_results.csv)
 # sec_lambda_time   -- deprecated (year-specific lambda removed from pipeline)
+
+
+def sec_hub_map():
+    """Hub county maps and centrality statistics."""
+    hub_csv = OUT / "hub_counties.csv"
+    str_csv = OUT / "bank_strength_centrality.csv"
+    map_a   = OUT / "hub_map_bank_strength.png"
+    map_b   = OUT / "hub_map_geo_transmission.png"
+
+    has_any = hub_csv.exists() or str_csv.exists() or map_a.exists() or map_b.exists()
+    if not has_any:
+        return ""
+
+    s = section("21. Hub Map -- Bank Network Centrality")
+    s += """
+**Source:** `analysis/extensions/hub_map.py`
+
+**References:** Favara & Imbs (2015); LeSage & Pace (2009); Bonacich (1987) *Power and Centrality*
+
+---
+
+**Map (a) -- Bank-network in-strength centrality:**
+
+```
+strength_i = sum_j w^{raw}_{ji}     (column sum of un-row-standardised W_bank)     ...(45)
+```
+
+Captures how many other counties' bank portfolios are most similar to county i in the raw cosine
+graph.  High-strength counties are major recipients of bank-network similarity links.
+
+**Map (b) -- SEM total transmission receiver (W_geo, Full sample):**
+
+```
+S = (I - lambda * W_geo)^{-1}
+receiver_i = sum_{j != i} S_{ij}     (off-diagonal column sum)                     ...(46)
+```
+
+Captures the total shock absorbed by county i from the spatial error network.
+lambda = lambda_hat_geo (Full sample) from section 1.
+
+"""
+    if map_a.exists():
+        s += "![Bank-network in-strength centrality](hub_map_bank_strength.png)\n\n"
+    else:
+        s += "*hub_map_bank_strength.png not yet generated.*\n\n"
+
+    if map_b.exists():
+        s += "![SEM total transmission receiver](hub_map_geo_transmission.png)\n\n"
+    else:
+        s += "*hub_map_geo_transmission.png not yet generated.*\n\n"
+
+    # Top-10 receiver table from hub_counties.csv
+    hub = load(hub_csv)
+    if hub is not None:
+        if "outcome" in hub.columns:
+            hub = hub[hub["outcome"] == "credit"].copy()
+        if "total_rx" in hub.columns and len(hub) > 0:
+            s += "\n**Top-10 receiver counties (total transmission received, W_geo):**\n\n"
+            top = hub.nlargest(10, "total_rx")[["fips5", "total_rx"]].copy()
+            top.columns = ["FIPS5", "Total received"]
+            s += md_table(top)
+        if "in_strength" in hub.columns and len(hub) > 0:
+            s += "\n**Top-10 in-strength counties (W_bank centrality):**\n\n"
+            top = hub.nlargest(10, "in_strength")[["fips5", "in_strength"]].copy()
+            top.columns = ["FIPS5", "In-strength"]
+            s += md_table(top)
+
+    # Fallback: bank_strength_centrality.csv
+    str_df = load(str_csv)
+    if hub is None and str_df is not None and "in_strength" in str_df.columns:
+        s += "\n**Top-10 in-strength counties (W_bank centrality):**\n\n"
+        top = str_df.nlargest(10, "in_strength")[["fips5", "in_strength"]].copy()
+        top.columns = ["FIPS5", "In-strength"]
+        s += md_table(top)
+
+    return s
+
+
+def sec_w1994():
+    df = load(OUT / "sem_w1994_results.csv")
+    if df is None:
+        return ""
+    s = section("22. Look-Ahead Robustness -- W_bank_1994")
+
+    s += """
+**Source:** `analysis/sem/sem_w1994.py`
+
+**References:** Favara & Imbs (2015, Data Appendix); Rice & Strahan (2010); Anselin (1988)
+
+---
+
+**Motivation:** `W_bank_avg` is time-averaged over 1994-2005, the same period as the outcome
+and treatment variables.  Post-IBBEA deregulation reshapes bank branching patterns, so
+`W_bank_avg` may be partly endogenous to the treatment.  `W_bank_1994` is built from the 1994
+FDIC cross-section only -- the year of IBBEA enactment -- predating post-deregulation network
+reshaping and exogenous to subsequent shocks.  Stability of lambda under `W_bank_1994` relative
+to `W_bank_avg` (section 1) supports the identification.
+
+**Construction:**
+
+```
+M[c,h] = 1  if BHC h has any branch in county c  (1994 only)
+w_cc'  = (M @ M.T)[c,c'] / sqrt(diag[c] * diag[c'])   (cosine similarity)  ...(47)
+```
+
+Zero diagonal, row-standardised after sample subsetting.  Construction identical to
+`pipeline/04_build_bank_weights.py` applied to the 1994 slice.
+
+**Lambda gap test** (H1: lambda_1994 > lambda_geo, one-sided):
+
+```
+z_gap = (lambda_hat_1994 - lambda_hat_geo) / sqrt(SE_1994^2 + SE_geo^2)    ...(48)
+p = Phi(-z_gap)
+```
+
+**Network persistence** (W_bank_1994 vs W_bank_avg):
+
+- `corr_rs`: Pearson r between row-standardised W_bank_1994 and W_bank_avg on the union
+  of their nonzero off-diagonal entries, after applying the estimation sample subset.
+- `corr_raw`: Pearson r between raw (un-standardised) W_bank_1994 cosine entries and
+  raw time-averaged W_bank_avg cosine entries on the union of nonzero positions.
+- `pct_shared`: % of W_bank_avg nonzero pairs also nonzero in W_bank_1994.
+
+A high corr_rs / large pct_shared indicates the pre-deregulation network already captures
+the same county pairs as the time-averaged network -- reducing concern about attenuation bias
+from using W_bank_1994.
+
+**Results:**
+
+"""
+    # Split into SEM results and persistence stats
+    sem_rows = []
+    persist_rows = []
+    for _, r in df.iterrows():
+        sem_rows.append({
+            "Sample": r["sample"],
+            "W": r["w_matrix"],
+            "beta": f"{fmt(r.get('beta',''))} ({fmt(r.get('se_beta',''))}){stars(r.get('p_beta', np.nan))}",
+            "lambda": f"{fmt(r.get('lam',''))} ({fmt(r.get('se_lam',''))}){stars(r.get('p_lam', np.nan))}",
+            "gap vs W_geo": f"{fmt(r.get('gap_lam', np.nan))} (z={fmt(r.get('z_gap', np.nan), 2)}){stars(r.get('p_gap_onesided', np.nan))}"
+                if pd.notna(r.get('gap_lam', np.nan)) else "--",
+            "N obs": safe_int(r.get("n_obs", np.nan)),
+        })
+        if pd.notna(r.get("corr_1994_avg_rs", np.nan)):
+            persist_rows.append(r)
+
+    s += md_table(pd.DataFrame(sem_rows))
+    s += "\n*Standard errors in parentheses. Gap = lambda_1994 - lambda_geo, one-sided z-test.*\n"
+
+    if persist_rows:
+        s += "\n**Network persistence statistics by W_bank_1994 estimation sample:**\n\n"
+        prows = []
+        for r in persist_rows:
+            prows.append({
+                "Sample": r.get("sample", ""),
+                "BHCs 1994": safe_int(r.get("n_hcs_1994", np.nan)),
+                "Pairs W_avg": safe_int(r.get("n_pairs_avg", np.nan)),
+                "Pairs W_1994": safe_int(r.get("n_pairs_1994", np.nan)),
+                "Shared %": fmt(r.get("pct_pairs_shared", np.nan), 1) + "%",
+                "corr rs": fmt(r.get("corr_1994_avg_rs", np.nan)),
+                "corr raw": fmt(r.get("corr_1994_avg_raw", np.nan)),
+            })
+        s += md_table(pd.DataFrame(prows))
+        s += ("\n*High corr / large pct_shared indicates the 1994 network spans the same county "
+              "pairs as the time-average, supporting use of W_bank_1994 as a pre-deregulation "
+              "instrument.*\n")
+
+    return s
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1281,7 +1398,6 @@ def build_report():
     builders = [
         sec_panel_fe_credit,
         sec_four_w,
-        sec_composite_credit,
         sec_jtest,
         sec_lm_diag,
         sec_conley,
@@ -1295,10 +1411,11 @@ def build_report():
         sec_sar_multiplier,
         sec_slx,
         sec_moran_diagnostics,
-        sec_moran_composite,
         sec_moran_wbank,
         sec_bank_overlap,
         sec_w_density,
+        sec_hub_map,
+        sec_w1994,
     ]
     N_TOTAL = len(builders)
 
@@ -1319,7 +1436,12 @@ def build_report():
 
     parts[toc_index] = build_toc(toc_entries)
     parts.append(f"\n*Report covers {found}/{N_TOTAL} analyses.*\n")
-    return "".join(parts)
+    report = "".join(parts)
+    return (
+        report
+        .replace("{CREDIT_X_SPEC}", CREDIT_X_SPEC)
+        .replace("{PLACEBO_X_SPEC}", PLACEBO_X_SPEC)
+    )
 
 
 if __name__ == "__main__":

@@ -5,7 +5,8 @@ Runs spatial LM diagnostics for the credit-growth dependent variable
 Dl_nloans_b under W_geo and W_bank, for full and border samples.
 
 Mean specification matches sem_credit.py:
-  Dl_nloans_b_it = beta * Linter_bra_it + county FE + year FE + u_it
+  Dl_nloans_b_it = beta * Linter_bra_it + gamma * X_ct
+                    + county FE + year FE + u_it
 
 Implementation note
 -------------------
@@ -39,7 +40,7 @@ from libpysal.weights import WSP
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa: applies spreg compatibility patch
-from panel_data import load_panel_with_credit
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit
 from utils import row_standardize, sparse_to_pysal_w
 from panel_data import get_samples
 from w_variants import load_w_geo, load_bank_variants
@@ -49,7 +50,7 @@ ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 
 DV = "Dl_nloans_b"
-XVAR = "Linter_bra"
+X_VARS = ["Linter_bra"] + CREDIT_CONTROLS
 
 # Compatibility patch for some spreg builds where diagnostics.breusch_pagan
 # references a module-level linear-algebra alias that is not imported.
@@ -73,7 +74,7 @@ def build_arrays(panel_sub, county_order, W_all, sample_label, w_label):
     t = len(years)
     year_pos = {yr: i for i, yr in enumerate(years)}
 
-    any_nan = panel_sub.groupby("fips5")[[DV, XVAR]].apply(
+    any_nan = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
         lambda g: g.isna().any().any()
     )
     counts = panel_sub.groupby("fips5")["year"].nunique()
@@ -95,14 +96,14 @@ def build_arrays(panel_sub, county_order, W_all, sample_label, w_label):
         .reset_index(drop=True)
     )
 
-    df_dm = two_way_within(df, [DV, XVAR])
+    df_dm = two_way_within(df, [DV] + X_VARS)
     y = df_dm[DV].values.reshape(-1, 1).astype(float)
-    x = df_dm[XVAR].values.reshape(-1, 1).astype(float)
+    x = df_dm[X_VARS].values.astype(float)
 
     assert not np.isnan(y).any(), f"NaN in y ({sample_label}, {w_label})"
     assert not np.isnan(x).any(), f"NaN in x ({sample_label}, {w_label})"
     assert y.shape == (n * t, 1), f"y shape {y.shape}, expected {(n * t, 1)}"
-    assert x.shape == (n * t, 1), f"x shape {x.shape}, expected {(n * t, 1)}"
+    assert x.shape == (n * t, len(X_VARS)), f"x shape {x.shape}, expected {(n * t, len(X_VARS))}"
 
     idx = np.array([county_order.index(c) for c in usable])
     W_sub = row_standardize(W_all[idx, :][:, idx])

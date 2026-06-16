@@ -35,16 +35,17 @@ import spreg
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa: applies spreg Panel_FE_Lag compatibility patch
 from utils import row_standardize, sparse_to_pysal_w
-from panel_data import load_panel_with_credit, get_samples
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit, get_samples
 from w_variants import load_w_geo, load_bank_variants
 
 ROOT           = Path(__file__).parents[2]
 COUNTY_PATH    = ROOT / "data" / "county_order_Wgeo.csv"
 CREDIT_SEM_CSV = ROOT / "output" / "panel_fe_credit_results.csv"
+X_VARS         = ["Linter_bra"] + CREDIT_CONTROLS
 
 
 def run_panel_fe_lag(y, x, w_pysal, w_label, ds_label, YEARS):
-    nx = ["Linter_bra"] + [f"yr{yr}" for yr in YEARS[1:]]
+    nx = X_VARS + [f"yr{yr}" for yr in YEARS[1:]]
     return spreg.Panel_FE_Lag(
         y, x, w_pysal,
         name_y="Dl_nloans_b",
@@ -57,7 +58,7 @@ def run_panel_fe_lag(y, x, w_pysal, w_label, ds_label, YEARS):
 def extract_lag(res, N, T):
     """Extract rho and beta_D from a Panel_FE_Lag result.
 
-    betas layout (Panel_FE_Lag): [beta_Linter_bra, yr1996, ..., yr2005, rho]
+    betas layout (Panel_FE_Lag): [beta_Linter_bra, controls..., yr..., rho]
     rho is last in betas, std_err, and z_stat — same convention as lambda
     in Panel_FE_Error.
     """
@@ -99,7 +100,9 @@ def run(output_dir=None):
     # ── Build arrays for one (panel_sub, W_all) combination ──────────────────
     def _build(panel_sub, W_all, sample_label):
         DV      = "Dl_nloans_b"
-        any_nan = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+        any_nan = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
+            lambda g: g.isna().any().any()
+        )
         sub_co  = set(panel_sub["fips5"].unique())
         full_rs = np.array(W_all.sum(axis=1)).flatten()
         islands = {county_order[i] for i, r in enumerate(full_rs) if r == 0}
@@ -115,8 +118,9 @@ def run(output_dir=None):
         t_idx_vec    = df["t_idx"].values
         year_dummies = np.column_stack([
             (t_idx_vec == year_pos[yr]).astype(np.float64) for yr in YEARS[1:]])
-        x_long  = np.hstack([df["Linter_bra"].values.reshape(-1, 1), year_dummies])
+        x_long  = np.hstack([df[X_VARS].values.astype(np.float64), year_dummies])
         assert not np.isnan(y_long).any()
+        assert not np.isnan(x_long).any()
         idx     = np.array([county_order.index(c) for c in usable])
         W_sub   = row_standardize(W_all[idx, :][:, idx])
         return y_long, x_long, sparse_to_pysal_w(W_sub), N
@@ -150,7 +154,7 @@ def run(output_dir=None):
     print()
     print("=" * W)
     print("Panel_FE_Lag (SAR) -- DV: Dl_nloans_b | Robustness vs SEM result")
-    print("Regressor: Linter_bra | Two-way FE (county + year dummies 1996-2005)")
+    print("Regressors: " + ", ".join(X_VARS) + " | Two-way FE")
     print("=" * W)
     print(f"{'Sample':<10} {'W':<22} {'N':>6}  "
           f"{'rho':>8} {'SE':>6}  {'beta_D':>8} {'SE':>6}")

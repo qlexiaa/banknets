@@ -8,8 +8,8 @@ W matrices: W_geo | W_bank | W_bank_count | W_bank_binary | W_bank_knn4
              | W_bank_nonGeo | W_bank_interstate | W_bank_intrastate
 Samples:    Full  | Border
 
-County filter: any-NaN on Dl_nloans_b, required because partial-NaN counties
-  cannot be used in Panel_FE_Error's balanced-panel estimator.
+County filter: counties with any NaN in Dl_nloans_b or X_VARS are excluded
+  so Panel_FE_Error's balanced-panel estimator receives complete DV+X data.
 
 Output: output/four_w_comparison_credit.csv
 """
@@ -26,19 +26,22 @@ import spreg
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa
 from utils import row_standardize, sparse_to_pysal_w
-from panel_data import load_panel_with_credit, get_samples
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit, get_samples
 from w_variants import load_w_geo, load_bank_variants
 
 ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 
 DV = "Dl_nloans_b"
+X_VARS = ["Linter_bra"] + CREDIT_CONTROLS
 
 
 def run_one(panel_sub, county_order, W_all, w_label, sample_label, YEARS, year_pos):
     T      = len(YEARS)
-    # any-NaN filter for DV (not all-NaN — panel needs to be balanced)
-    any_nan = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
+    # Exclude counties with any NaN in Dl_nloans_b or X_VARS for Panel_FE_Error.
+    any_nan = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
+        lambda g: g.isna().any().any()
+    )
     sub_co  = set(panel_sub["fips5"].unique())
 
     usable = [c for c in county_order if c in sub_co and not any_nan.get(c, True)]
@@ -64,17 +67,18 @@ def run_one(panel_sub, county_order, W_all, w_label, sample_label, YEARS, year_p
     year_dummies = np.column_stack([
         (t_idx_vec == year_pos[yr]).astype(np.float64) for yr in YEARS[1:]
     ])
-    x_long = np.hstack([df["Linter_bra"].values.reshape(-1, 1), year_dummies])
+    x_long = np.hstack([df[X_VARS].values.astype(np.float64), year_dummies])
 
     assert not np.isnan(y_long).any(), f"NaN in y ({sample_label}, {w_label})"
+    assert not np.isnan(x_long).any(), f"NaN in X ({sample_label}, {w_label})"
     assert y_long.shape == (N * T, 1)
-    assert x_long.shape == (N * T, 11)
+    assert x_long.shape == (N * T, len(X_VARS) + len(YEARS) - 1)
 
     idx     = np.array([county_order.index(c) for c in usable])
     W_sub   = row_standardize(W_all[idx, :][:, idx])
     w_pysal = sparse_to_pysal_w(W_sub)
 
-    nx  = ["Linter_bra"] + [f"yr{yr}" for yr in YEARS[1:]]
+    nx  = X_VARS + [f"yr{yr}" for yr in YEARS[1:]]
     res = spreg.Panel_FE_Error(
         y_long, x_long, w_pysal,
         name_y=DV, name_x=nx, name_w=w_label, name_ds=sample_label,
