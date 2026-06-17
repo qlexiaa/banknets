@@ -1,0 +1,13 @@
+stat,value
+n_bhc_total,7941.0
+n_bhc_multi_county,4284.0
+n_bhc_multi_state,707.0
+share_bhc_multi_county,0.5395
+share_bhc_multi_state,0.089
+mean_counties_per_multi_bhc,5.38
+median_counties_per_multi_bhc,2.17
+n_county_pairs_connected,210546.0
+n_pairs_cross_state,196713.0
+share_pairs_cross_state,0.9343
+n_pairs_only_via_multi_bhc,191685.0
+share_pairs_only_via_multi_bhc,0.9104

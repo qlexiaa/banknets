@@ -1205,6 +1205,97 @@ Density statistics for every W matrix used in the analysis pipeline.
     return s
 
 
+def sec_bank_location_branches():
+    df = load(OUT / "bank_location_branches.csv")
+    sod = load(OUT / "bank_network_descriptives.csv")
+    if df is None:
+        return ""
+    s = section("3. Bank-Type Decomposition -- Importance of Location and Branches")
+
+    s += """
+**Source:** `analysis/diagnostics/bank_location_branches.py`
+
+**References:** Favara & Imbs (2015, AER 104(3): 272-323) Tables 3 and A2
+
+---
+
+**Purpose:** Decomposes the credit-growth response to interstate branching
+deregulation (`Linter_bra`) by bank type, testing whether the effect
+concentrates in out-of-state banks with a *local branch presence*.
+
+**Three panels:**
+- **Panel A** (OOS-lb): Out-of-state banks with local branches -- the
+  transmission channel identified in Favara & Imbs (2015).
+- **Panel B** (OOS-nb): Out-of-state banks without local branches.
+  Should show no effect if the channel requires physical presence.
+- **Panel C** (IS): In-state banks. Placebo: deregulation allowed
+  *in*-state branching which was already mostly complete by 1994.
+
+**Regression** (same as F&I equation 1, two-way FE):
+
+```
+delta_ln(outcome)_ct = beta * Linter_bra_ct + gamma' X_ct
+                     + L_delta_ln(outcome)_ct
+                     + alpha_c + tau_t + u_ct
+```
+
+- `X_ct`: `{CREDIT_X_SPEC}` (8 economic controls)
+- `alpha_c` = county FE (absorbed by PanelOLS `entity_effects=True`)
+- `tau_t` = year FE (year dummies 1995-2005)
+- SEs clustered by state
+
+**Cross-panel test:** Wald z-test H0: beta_panel = beta_A (matched by
+outcome type), assuming panel-independence (conservative).
+
+---
+
+"""
+
+    samples = df["sample"].unique().tolist() if "sample" in df.columns else ["Full"]
+    for samp in samples:
+        sub = df[df["sample"] == samp].copy() if "sample" in df.columns else df.copy()
+        if sub.empty:
+            continue
+        s += f"\n**Sample: {samp}**\n\n"
+
+        panels = sub["panel"].unique().tolist() if "panel" in sub.columns else []
+        for panel_id in sorted(panels):
+            prows = sub[sub["panel"] == panel_id].copy()
+            if prows.empty:
+                continue
+            panel_lbl = prows.iloc[0].get("panel_label", f"Panel {panel_id}")
+            s += f"*{panel_id}: {panel_lbl}*\n\n"
+
+            rows = []
+            for _, r in prows.iterrows():
+                beta_str = (f"{fmt(r['beta'])} ({fmt(r['se'])}){stars(r['pval'])}"
+                            if pd.notna(r.get("beta")) else "--")
+                wald_str = (pval_str(r["test_vs_A_pval"])
+                            if (panel_id != "A"
+                                and pd.notna(r.get("test_vs_A_pval")))
+                            else "--")
+                rows.append({
+                    "Outcome": r.get("outcome", r.get("outcome_key", "")),
+                    "beta (SE)": beta_str,
+                    "p-val": pval_str(r["pval"]) if pd.notna(r.get("pval")) else "--",
+                    "Wald vs A": wald_str,
+                    "N obs": safe_int(r.get("N", np.nan)),
+                    "R2 within": fmt(r.get("R2_within", np.nan)),
+                })
+            s += md_table(pd.DataFrame(rows))
+
+    if sod is not None:
+        s += "\n**Bank-network descriptives (FDIC Summary of Deposits, 1994-2005):**\n\n"
+        sod_rows = [{"Statistic": r["stat"], "Value": fmt(r["value"])}
+                    for _, r in sod.iterrows()]
+        s += md_table(pd.DataFrame(sod_rows))
+        s += ("\n*Multi-county BHCs are those with branches in >1 county on average.*\n"
+              "*County pairs: connected = non-zero in W\\_bank\\_binary (shared BHC presence).*\n"
+              "*Multi-state BHC pairs = pairs where ALL shared BHCs operate in 2+ states.*\n")
+
+    return s
+
+
 # ── Preserved (not in active builders) ────────────────────────────────────────
 # sec_sar_iv        -- deprecated (see output/deprecated/sar_iv_results.csv)
 # sec_lambda_time   -- deprecated (year-specific lambda removed from pipeline)
@@ -1398,6 +1489,7 @@ def build_report():
     builders = [
         sec_panel_fe_credit,
         sec_four_w,
+        sec_bank_location_branches,
         sec_jtest,
         sec_lm_diag,
         sec_conley,

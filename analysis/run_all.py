@@ -16,7 +16,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(ANALYSIS_DIR))
 
 from diagnostics import moran_baseline, moran_bank_variants, network_overlap
-from diagnostics import w_density_summary
+from diagnostics import w_density_summary, bank_location_branches
 from extensions import multiplier_counterfactual, slx_exposure
 from inference import conley_se, fgls
 from model_selection import jtest, lm_tests
@@ -72,6 +72,8 @@ def main():
              lambda: multiplier_counterfactual.run(OUTPUT_DIR))
     run_step("18. Look-ahead robustness -- W_bank_1994",
              lambda: sem_w1994.run(OUTPUT_DIR))
+    run_step("19. Bank-type decomposition (Favara-Imbs Table 3 / A2)",
+             lambda: bank_location_branches.run(OUTPUT_DIR))
 
 
 if __name__ == "__main__":
