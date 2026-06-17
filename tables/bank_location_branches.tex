@@ -1,0 +1,50 @@
+\begin{table}[htbp]
+\centering
+\caption{Credit Growth and Bank Deregulation by Bank Type and Branch Location (Full Sample)}
+\label{tab:bank_location_branches}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+ & \multicolumn{2}{c}{Panel A: OOS, local branches} & \multicolumn{2}{c}{Panel B: OOS, no branches} & \multicolumn{2}{c}{Panel C: In-state} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+ & $\hat\beta$ & SE & $\hat\beta$ & SE & $\hat\beta$ & SE \\
+\midrule
+\multirow{2}{*}{\# mortgages originated} & 0.1611^{***} &  & 0.0158 &  & 0.0034 &  \\
+ & (0.0598) &  & (0.0111) $[0.016]$ &  & (0.0101) $[0.013]$ &  \\[2pt]
+\multirow{2}{*}{Volume mortgages} & 0.1668^{***} &  & 0.0145 &  & -0.0026 &  \\
+ & (0.0606) &  & (0.0112) $[0.011]$ &  & (0.0111) $[0.007]$ &  \\[2pt]
+\multirow{2}{*}{Denial rate} & 0.0694 &  & 0.0124 &  & 0.0049 &  \\
+ & (0.0585) &  & (0.0237) $[0.370]$ &  & (0.0151) $[0.306]$ &  \\[2pt]
+\multirow{2}{*}{Loan-to-income ratio} & 0.1651^{***} &  & 0.0142 &  & -0.0029 &  \\
+ & (0.0601) &  & (0.0114) $[0.011]$ &  & (0.0113) $[0.007]$ &  \\[2pt]
+\multirow{2}{*}{\# loans sold} & 0.0554 &  & 0.0100 &  & -0.0252 &  \\
+ & (0.0807) &  & (0.0138) $[0.564]$ &  & (0.0192) $[0.356]$ &  \\[2pt]
+\multirow{2}{*}{\# branches} & 0.0769^{***} &  & -- &  & 0.0012 &  \\
+ & (0.0293) &  & -- &  & (0.0066) $[0.012]$ &  \\[2pt]
+\midrule
+$N$ obs (A) & \multicolumn{6}{r}{4,783} \\
+$N$ counties (A) & \multicolumn{6}{r}{790} \\
+$N$ obs (B) & \multicolumn{6}{r}{9,988} \\
+$N$ counties (B) & \multicolumn{6}{r}{1,018} \\
+$N$ obs (C) & \multicolumn{6}{r}{9,841} \\
+$N$ counties (C) & \multicolumn{6}{r}{1,017} \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+\small
+\item \textit{Notes:} Panel fixed-effects regression (county FE + year FE).
+Dependent variable: log-change in outcome. Treatment variable: \textit{Linter\_bra}
+(Favara \& Imbs 2015 interstate-branching deregulation index).
+Controls: $\Delta\ln(\text{income})$, $\Delta\ln(\text{pop})$,
+$\Delta\ln(\text{HPI})$, $\Delta\ln(\text{Herfindahl})$ and their lags;
+lagged own DV (when available); year dummies 1995--2005.
+Standard errors (in parentheses) clustered by state.
+Brackets show $p$-value of the test $H_0: \hat\beta_{\text{panel}} = \hat\beta_A$.
+The cross-panel variance $\mathrm{Var}(\hat\beta_{\text{panel}} - \hat\beta_A)$
+is estimated via the SUR-score method (Cameron \& Miller 2015, \S2.5):
+state-level score cross-products from Frisch-Waugh-Lovell residuals
+identify $\mathrm{Cov}(\hat\beta_A, \hat\beta_{\text{panel}})$ without changing
+the individual equation estimates.
+$^{*}p<0.10$, $^{**}p<0.05$, $^{***}p<0.01$.
+\end{tablenotes}
+\end{table}
