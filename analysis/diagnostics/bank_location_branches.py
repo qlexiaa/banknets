@@ -648,8 +648,19 @@ def _fmt(x, d=4):
 
 
 def _build_latex(results: pd.DataFrame, sample: str) -> str:
-    """Build a LaTeX tabular for one sample (Full or Contig)."""
+    """Build a LaTeX tabular for one sample."""
     sub = results[results["sample"] == sample].copy()
+
+    caption_suffix = {
+        "Full": r" (Full Sample)",
+        "Contig": r" (Contiguous Counties)",
+        "NonContig": r" (Non-contiguous Sample)",
+    }.get(sample, rf" ({sample})")
+    label_suffix = {
+        "Full": "",
+        "Contig": "_contig",
+        "NonContig": "_noncontig",
+    }.get(sample, f"_{sample.lower()}")
 
     # Canonical outcome ordering
     outcome_order = ["nloans", "vloans", "nden", "lir", "nsold", "nbra"]
@@ -685,10 +696,9 @@ def _build_latex(results: pd.DataFrame, sample: str) -> str:
         r"\begin{table}[htbp]",
         r"\centering",
         (r"\caption{Credit Growth and Bank Deregulation by Bank Type and Branch Location"
-         + (r" (Contiguous Counties)" if sample == "Contig" else r" (Full Sample)")
+         + caption_suffix
          + r"}"),
-        (r"\label{tab:bank_location_branches"
-         + ("_contig" if sample == "Contig" else "") + r"}"),
+        (r"\label{tab:bank_location_branches" + label_suffix + r"}"),
         r"\small",
         r"\begin{tabular}{l" + "cc" * len(panel_order) + r"}",
         r"\toprule",
@@ -806,10 +816,11 @@ def run(output_dir: Path) -> None:
     print("Loading panel data ...")
     df = _load_raw_data()
 
-    # Samples: Full and Contig (border == 1)
+    # Samples: Full, Contig (border == 1), and NonContig (border == 0)
     samples = [
-        ("Full",   df),
-        ("Contig", df[df["border"] == 1].copy()),
+        ("Full",      df),
+        ("Contig",    df[df["border"] == 1].copy()),
+        ("NonContig", df[df["border"] == 0].copy()),
     ]
 
     all_rows: list[dict] = []
@@ -832,12 +843,16 @@ def run(output_dir: Path) -> None:
     print(f"\nResults written to {csv_path}  ({len(results)} rows)")
 
     # ── LaTeX tables ──────────────────────────────────────────────────────
-    for sample in ("Full", "Contig"):
+    for sample in ("Full", "Contig", "NonContig"):
         if sample not in results["sample"].values:
             continue
         tex = _build_latex(results, sample)
-        fname = (f"bank_location_branches"
-                 + ("_contig" if sample == "Contig" else "") + ".tex")
+        suffix = {
+            "Full": "",
+            "Contig": "_contig",
+            "NonContig": "_noncontig",
+        }[sample]
+        fname = f"bank_location_branches{suffix}.tex"
         tex_path = TABLES_DIR / fname
         tex_path.write_text(tex, encoding="utf-8")
         print(f"LaTeX table written to {tex_path}")

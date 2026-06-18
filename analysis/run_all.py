@@ -23,6 +23,7 @@ from model_selection import jtest, lm_tests
 from sar import multiplier_decomposition, sar_credit, sar_iv_credit
 from sem import (
     sem_credit,
+    sem_credit_nocontrols,
     sem_knn_sweep,
     sem_link_restrictions,
     sem_w1994,
@@ -48,31 +49,33 @@ def main():
              lambda: lm_tests.run(OUTPUT_DIR))
     run_step("6. Main Panel_FE_Error: W_geo vs W_bank",
              lambda: sem_credit.run(OUTPUT_DIR))
-    run_step("7. W_geo / W_bank_bin / W_bank_count / W_bank_nonGeo",
+    run_step("7. Main Panel_FE_Error without county controls",
+             lambda: sem_credit_nocontrols.run(OUTPUT_DIR))
+    run_step("8. W_geo / W_bank_bin / W_bank_count / W_bank_nonGeo",
              lambda: sem_w_variants.run(OUTPUT_DIR))
-    run_step("8. nonGeo / interstate / intrastate restrictions",
+    run_step("9. nonGeo / interstate / intrastate restrictions",
              lambda: sem_link_restrictions.run(OUTPUT_DIR))
-    run_step("9. KNN sweep k = 1..20",
+    run_step("10. KNN sweep k = 1..20",
              lambda: sem_knn_sweep.run(OUTPUT_DIR))
-    run_step("10. Davidson-MacKinnon J-tests",
+    run_step("11. Davidson-MacKinnon J-tests",
              lambda: jtest.run(OUTPUT_DIR))
-    run_step("11. Panel_FE_Lag robustness",
+    run_step("12. Panel_FE_Lag robustness",
              lambda: sar_credit.run(OUTPUT_DIR))
-    run_step("12. IV-SAR and SDM-IV robustness",
+    run_step("13. IV-SAR and SDM-IV robustness",
              lambda: sar_iv_credit.run(OUTPUT_DIR))
-    run_step("13. Direct/indirect effects, distance decay",
+    run_step("14. Direct/indirect effects, distance decay",
              lambda: multiplier_decomposition.run(OUTPUT_DIR))
-    run_step("14. SE estimator comparison (Conley 1999; Colella et al. 2019)",
+    run_step("15. SE estimator comparison (Conley 1999; Colella et al. 2019)",
              lambda: conley_se.run(OUTPUT_DIR))
-    run_step("15. FGLS vs OLS point-estimator comparison",
+    run_step("16. FGLS vs OLS point-estimator comparison",
              lambda: fgls.run(OUTPUT_DIR))
-    run_step("16. Bank-network SLX exposure augmentation",
+    run_step("17. Bank-network SLX exposure augmentation",
              lambda: slx_exposure.run(OUTPUT_DIR))
-    run_step("17. SAR multiplier decomposition and counterfactual",
+    run_step("18. SAR multiplier decomposition and counterfactual",
              lambda: multiplier_counterfactual.run(OUTPUT_DIR))
-    run_step("18. Look-ahead robustness -- W_bank_1994",
+    run_step("19. Look-ahead robustness -- W_bank_1994",
              lambda: sem_w1994.run(OUTPUT_DIR))
-    run_step("19. Bank-type decomposition (Favara-Imbs Table 3 / A2)",
+    run_step("20. Bank-type decomposition (Favara-Imbs Table 3 / A2)",
              lambda: bank_location_branches.run(OUTPUT_DIR))
 
 

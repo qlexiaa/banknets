@@ -38,7 +38,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from utils import row_standardize
 from w_variants import load_w_geo, load_bank_variants
-from panel_data import load_panel_with_credit
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit
 
 ROOT             = Path(__file__).parents[2]
 COUNTY_PATH      = ROOT / "data" / "county_order_Wgeo.csv"
@@ -75,7 +75,18 @@ def load_lambdas():
     cr  = pd.read_csv(CREDIT_CSV)
 
     for sample_tag in ["full", "contig", "noncontig"]:
+        geo_model = f"FE W_geo ({sample_tag})"
+        bank_model = f"FE W_bank ({sample_tag})"
+        bank_row = cr[cr["model"] == bank_model]
+        geo_row = cr[cr["model"] == geo_model]
+        if len(bank_row) > 0 and "lam_geo" in bank_row.columns and not pd.isna(bank_row["lam_geo"].iloc[0]):
+            lam[("credit", "W_geo", sample_tag)] = float(bank_row["lam_geo"].iloc[0])
+        elif len(geo_row) > 0:
+            lam[("credit", "W_geo", sample_tag)] = float(geo_row["lam"].iloc[0])
+
         for w_tag in ["W_geo", "W_bank", "W_bank_knn3", "W_bank_knn4"]:
+            if w_tag == "W_geo" and ("credit", "W_geo", sample_tag) in lam:
+                continue
             expected_model = f"FE {w_tag} ({sample_tag})"
             mask = cr["model"] == expected_model
             rows = cr.loc[mask, "lam"]
@@ -291,21 +302,47 @@ def run(output_dir=None):
     panel = load_panel_with_credit()
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
 
-    # Usable county set per sample: drop any-NaN counties for each sub-panel
+    # Usable county set per sample: match the common W_geo/W_bank SEM sample.
+    X_VARS = ["Linter_bra"] + CREDIT_CONTROLS
     def _usable_counties(panel_sub):
-        any_nan = panel_sub.groupby("fips5")["Dl_nloans_b"].apply(
-            lambda s: s.isna().any())
+        any_nan = panel_sub.groupby("fips5")[["Dl_nloans_b"] + X_VARS].apply(
+            lambda g: g.isna().any().any())
         sub_co = set(panel_sub["fips5"].unique())
+        island_sets = []
+        for W_sp in (W_geo_sp, W_bank_sp, W_knn3_sp, W_knn4_sp):
+            full_rs = np.array(W_sp.sum(axis=1)).flatten()
+            island_sets.append({county_order[i] for i, r in enumerate(full_rs) if r == 0})
+        islands = set().union(*island_sets)
         return [c for c in county_order
-                if c in sub_co and not any_nan.get(c, True)]
+                if c in sub_co and not any_nan.get(c, True) and c not in islands]
 
-    SAMPLE_COUNTIES = {
+    def _common_nonisland_counties(co_list):
+        """Iteratively drop counties that become islands under any displayed W."""
+        labels = list(co_list)
+        while labels:
+            idx = np.array([county_order.index(c) for c in labels])
+            keep = np.ones(len(labels), dtype=bool)
+            for W_sp in W_MATS.values():
+                row_sums = np.array(W_sp[idx, :][:, idx].sum(axis=1)).ravel()
+                keep &= row_sums > 0
+            if keep.all():
+                return labels
+            labels = [c for c, ok in zip(labels, keep) if ok]
+        return labels
+
+    raw_sample_counties = {
         "full":     _usable_counties(panel),
         "contig":   _usable_counties(panel[panel["border"] == 1]),
         "noncontig":_usable_counties(panel[panel["border"] == 0]),
     }
+    SAMPLE_COUNTIES = {
+        stag: _common_nonisland_counties(co_list)
+        for stag, co_list in raw_sample_counties.items()
+    }
     for stag, co_list in SAMPLE_COUNTIES.items():
-        print(f"  {stag}: {len(co_list)} usable counties")
+        raw_n = len(raw_sample_counties[stag])
+        note = "" if raw_n == len(co_list) else f" ({raw_n} before common non-island trim)"
+        print(f"  {stag}: {len(co_list)} usable counties{note}")
 
     print("\nLoading / downloading county centroids ...")
     centroid_result = load_centroids(county_order)
@@ -353,19 +390,18 @@ def run(output_dir=None):
         print(f"  {outcome.upper()} | {w_label} | {sample_tag}  lambda={lam:.6f}")
         print(f"{'='*60}")
 
-        # Subset W to the sample counties first (so the centroid/reach lookup
-        # uses the correct county set), then drop zero-row structural islands.
-        # This is the fix for missing avg-reach in sample-specific combos:
-        # previously drop_zero_rows used the full county_order, so for contig/
-        # noncontig the reach was computed over all non-island counties rather
-        # than just those in the sample.
+        # Subset W to the common non-island sample. The same county list is used
+        # for every displayed W within a sample, so W_geo and W_bank multipliers
+        # are computed on matched matrices.
         idx_samp    = np.array([county_order.index(c) for c in co_samp])
-        W_sp_samp   = W_sp[idx_samp, :][:, idx_samp].tocsr()
-        W_sp_sub, co_sub = drop_zero_rows(W_sp_samp, co_samp)
+        W_sp_sub    = W_sp[idx_samp, :][:, idx_samp].tocsr()
+        co_sub      = list(co_samp)
         N_sub   = len(co_sub)
         W_dense = W_sp_sub.toarray().astype(np.float64)
         row_sums = W_dense.sum(axis=1, keepdims=True)
         nonzero_rows = row_sums[:, 0] > 0
+        if not np.all(nonzero_rows):
+            raise RuntimeError(f"Zero-row county remained in {w_label} / {sample_tag}")
         W_dense[nonzero_rows] /= row_sums[nonzero_rows]
 
         # ── 1. Inverse ────────────────────────────────────────────────────────
@@ -436,6 +472,7 @@ def run(output_dir=None):
             "outcome":         outcome,
             "w_matrix":        w_label,
             "sample":          sample_tag,
+            "n_counties":      N_sub,
             "lambda":          lam,
             "total_multiplier": avg_total,
             "avg_direct":      avg_direct,
@@ -453,14 +490,15 @@ def run(output_dir=None):
     print("SPATIAL MULTIPLIER DECOMPOSITION SUMMARY")
     print("S = (I - lambda*W)^{-1}   |   NOTE: SEM error-process co-movement, not causal SAR")
     print("=" * W_TBL)
-    hdr = (f"{'Outcome':<10} {'W':<12} {'Sample':<12} {'lambda':>8} {'Total mult':>11} "
+    hdr = (f"{'Outcome':<10} {'W':<12} {'Sample':<12} {'N':>5} {'lambda':>8} {'Total mult':>11} "
            f"{'Avg direct':>11} {'Avg indir':>10} {'Indir %':>8} "
            f"{f'Avg reach ({reach_label})':>18}")
     print(hdr)
     print("-" * W_TBL)
     for r in summary_rows:
         reach_key = f"avg_reach_{reach_label}"
-        print(f"{r['outcome']:<10} {r['w_matrix']:<12} {r['sample']:<12} {r['lambda']:>8.4f} "
+        print(f"{r['outcome']:<10} {r['w_matrix']:<12} {r['sample']:<12} "
+              f"{r['n_counties']:>5} {r['lambda']:>8.4f} "
               f"{r['total_multiplier']:>11.4f} {r['avg_direct']:>11.4f} "
               f"{r['avg_indirect']:>10.4f} {r['indirect_share_pct']:>7.2f}% "
               f"{r.get(reach_key, float('nan')):>18.1f}")

@@ -1,15 +1,17 @@
 """
 sem_w_variants.py
 =================
-Credit-growth SEM comparison across seven bank-network weight matrices.
+Credit-growth SEM comparison across bank-network weight matrices.
 Dependent variable: Dl_nloans_b (dln commercial-bank mortgage loans).
 
-W matrices: W_geo | W_bank | W_bank_count | W_bank_binary | W_bank_knn4
+W matrices: W_geo | W_bank | W_bank_count | W_bank_binary | W_bank_knn3 | W_bank_knn4
              | W_bank_nonGeo | W_bank_interstate | W_bank_intrastate
-Samples:    Full  | Border
+Samples:    Full  | Contig | NonContig
 
 County filter: counties with any NaN in Dl_nloans_b or X_VARS are excluded
   so Panel_FE_Error's balanced-panel estimator receives complete DV+X data.
+  Gap tests use a paired W_geo estimate rebuilt on each bank-W usable county
+  list, so lambda comparisons use the same counties on both sides.
 
 Output: output/four_w_comparison_credit.csv
 """
@@ -36,8 +38,7 @@ DV = "Dl_nloans_b"
 X_VARS = ["Linter_bra"] + CREDIT_CONTROLS
 
 
-def run_one(panel_sub, county_order, W_all, w_label, sample_label, YEARS, year_pos):
-    T      = len(YEARS)
+def _usable_counties(panel_sub, county_order, W_all):
     # Exclude counties with any NaN in Dl_nloans_b or X_VARS for Panel_FE_Error.
     any_nan = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
         lambda g: g.isna().any().any()
@@ -49,7 +50,14 @@ def run_one(panel_sub, county_order, W_all, w_label, sample_label, YEARS, year_p
     # Drop structural W-islands
     full_rs = np.array(W_all.sum(axis=1)).flatten()
     islands = {county_order[i] for i, r in enumerate(full_rs) if r == 0}
-    usable  = [c for c in usable if c not in islands]
+    return [c for c in usable if c not in islands]
+
+
+def run_one(panel_sub, county_order, W_all, w_label, sample_label, YEARS, year_pos,
+            usable=None):
+    T      = len(YEARS)
+    usable = list(usable) if usable is not None else _usable_counties(
+        panel_sub, county_order, W_all)
     N       = len(usable)
 
     usable_pos = {c: i for i, c in enumerate(usable)}
@@ -99,6 +107,7 @@ def run_one(panel_sub, county_order, W_all, w_label, sample_label, YEARS, year_p
         p_lam      = float(res.z_stat[-1][1]),
         logll      = float(res.logll),
         aic        = float(res.aic),
+        _usable_counties = tuple(usable),
     )
 
 
@@ -114,15 +123,18 @@ def run(output_dir=None):
     assert gal_order == county_order
 
     bank_variants = load_bank_variants(county_order, W_geo_all=W_geo_all)
-    W_MATRICES    = [("W_geo", W_geo_all)] + list(bank_variants.items())
+    BANK_MATRICES = list(bank_variants.items())
+    W_MATRICES    = [("W_geo", W_geo_all)] + BANK_MATRICES
 
     panel    = load_panel_with_credit()
     YEARS    = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
 
+    samples = get_samples(panel)
+
     results = {}
-    for sample_label, panel_sub in get_samples(panel):
-        for w_label, W_all in W_MATRICES:
+    for sample_label, panel_sub in samples:
+        for w_label, W_all in BANK_MATRICES:
             print(f"  Estimating: {sample_label} x {w_label} ...", flush=True)
             try:
                 results[(sample_label, w_label)] = run_one(
@@ -131,7 +143,41 @@ def run(output_dir=None):
                 print(f"  [SKIP] {sample_label} x {w_label}: {exc}")
                 results[(sample_label, w_label)] = None
 
+        base_bank = results.get((sample_label, "W_bank"))
+        base_usable = None if base_bank is None else base_bank["_usable_counties"]
+        print(f"  Estimating: {sample_label} x W_geo on W_bank counties ...", flush=True)
+        try:
+            results[(sample_label, "W_geo")] = run_one(
+                panel_sub, county_order, W_geo_all, "W_geo", sample_label,
+                YEARS, year_pos, usable=base_usable)
+        except Exception as exc:
+            print(f"  [SKIP] {sample_label} x W_geo: {exc}")
+            results[(sample_label, "W_geo")] = None
+
     BANK_WS = list(bank_variants.keys())
+    paired_geo = {}
+    paired_geo_cache = {
+        (sample_label, r["_usable_counties"]): r
+        for sample_label, _ in samples
+        for r in [results.get((sample_label, "W_geo"))]
+        if r is not None
+    }
+    for sample_label, panel_sub in samples:
+        for w_label in BANK_WS:
+            r = results.get((sample_label, w_label))
+            if r is None:
+                paired_geo[(sample_label, w_label)] = None
+                continue
+            cache_key = (sample_label, r["_usable_counties"])
+            if cache_key not in paired_geo_cache:
+                print(
+                    f"  Estimating paired W_geo: {sample_label} x {w_label} sample ...",
+                    flush=True,
+                )
+                paired_geo_cache[cache_key] = run_one(
+                    panel_sub, county_order, W_geo_all, "W_geo", sample_label,
+                    YEARS, year_pos, usable=r["_usable_counties"])
+            paired_geo[(sample_label, w_label)] = paired_geo_cache[cache_key]
 
     def gap_stat(r_bank, r_geo):
         gap    = r_bank["lam"]  - r_geo["lam"]
@@ -146,7 +192,7 @@ def run(output_dir=None):
         if np.isnan(p): return "   "
         return "***" if p < 0.01 else ("**" if p < 0.05 else ("*" if p < 0.10 else "   "))
 
-    W_COL = 96
+    W_COL = 112
     print()
     print("=" * W_COL)
     print("TABLE A -- Panel_FE_Error: beta and lambda | DV: Dl_nloans_b (two-way FE, ML)")
@@ -154,7 +200,7 @@ def run(output_dir=None):
     print(f"{'Sample':<10} {'W matrix':<22} {'N':>6}  "
           f"{'beta':>8} {'SE':>6}  {'lambda':>8} {'SE':>6}  {'logLL':>11}  {'AIC':>11}")
     print("-" * W_COL)
-    for sample_label, _ in get_samples(panel):
+    for sample_label, _ in samples:
         for w_label, _ in W_MATRICES:
             r = results.get((sample_label, w_label))
             if r is None:
@@ -169,22 +215,21 @@ def run(output_dir=None):
 
     print()
     print("=" * W_COL)
-    print("TABLE B -- Lambda gap vs W_geo | z_gap one-sided H1: lam_bank > lam_geo")
+    print("TABLE B -- Lambda gap vs same-sample W_geo | z_gap one-sided H1: lam_bank > lam_geo")
     print("=" * W_COL)
     print(f"{'Sample':<10} {'W vs W_geo':<22}  "
-          f"{'gap':>7} {'se_gap':>7} {'z_gap':>7} {'p(1-tail)':>10}  "
+          f"{'N_geo':>6} {'lam_geo':>8}  {'gap':>7} {'se_gap':>7} {'z_gap':>7} {'p(1-tail)':>10}  "
           f"{'LR stat':>9} {'p_LR':>8}")
     print("-" * W_COL)
-    for sample_label, _ in get_samples(panel):
-        r_geo = results.get((sample_label, "W_geo"))
-        if r_geo is None:
-            continue
+    for sample_label, _ in samples:
         for w_label in BANK_WS:
             r = results.get((sample_label, w_label))
-            if r is None:
+            r_geo = paired_geo.get((sample_label, w_label))
+            if r is None or r_geo is None:
                 continue
             gap, se_gap, z_gap, p_gap, lr, p_lr = gap_stat(r, r_geo)
             print(f"{sample_label:<10} {w_label:<22}  "
+                  f"{r_geo['n_counties']:>6} {r_geo['lam']:>8.4f}  "
                   f"{gap:>7.4f} {se_gap:>7.4f} {z_gap:>7.3f} {p_gap:>10.4f}{stars(p_gap)}  "
                   f"{lr:>9.2f} {p_lr:>8.4f}{stars(p_lr)}")
         print()
@@ -192,8 +237,7 @@ def run(output_dir=None):
 
     if output_dir is not None:
         csv_rows = []
-        for sample_label, _ in get_samples(panel):
-            r_geo = results.get((sample_label, "W_geo"))
+        for sample_label, _ in samples:
             for w_label, _ in W_MATRICES:
                 r = results.get((sample_label, w_label))
                 if r is None:
@@ -201,17 +245,40 @@ def run(output_dir=None):
                 row = {k: r[k] for k in
                        ["sample","w_matrix","n_counties","n_obs",
                         "beta","se_beta","p_beta","lam","se_lam","p_lam"]}
-                if w_label == "W_geo" or r_geo is None:
+                r_geo = r if w_label == "W_geo" else paired_geo.get((sample_label, w_label))
+                if r_geo is None:
+                    row.update(lam_geo=np.nan, se_lam_geo=np.nan, p_lam_geo=np.nan,
+                               n_counties_geo=np.nan, n_obs_geo=np.nan,
+                               logll_geo=np.nan)
                     row.update(gap_vs_geo=np.nan, se_gap=np.nan,
-                               z_gap=np.nan, p_gap_onesided=np.nan)
+                               z_gap=np.nan, p_gap_onesided=np.nan,
+                               lr_vs_geo=np.nan, p_lr_vs_geo=np.nan)
+                elif w_label == "W_geo":
+                    row.update(lam_geo=r_geo["lam"], se_lam_geo=r_geo["se_lam"],
+                               p_lam_geo=r_geo["p_lam"],
+                               n_counties_geo=r_geo["n_counties"],
+                               n_obs_geo=r_geo["n_obs"],
+                               logll_geo=r_geo["logll"])
+                    row.update(gap_vs_geo=np.nan, se_gap=np.nan,
+                               z_gap=np.nan, p_gap_onesided=np.nan,
+                               lr_vs_geo=np.nan, p_lr_vs_geo=np.nan)
                 else:
-                    gap, se_gap, z_gap, p_gap, _, _ = gap_stat(r, r_geo)
+                    gap, se_gap, z_gap, p_gap, lr, p_lr = gap_stat(r, r_geo)
+                    row.update(lam_geo=r_geo["lam"], se_lam_geo=r_geo["se_lam"],
+                               p_lam_geo=r_geo["p_lam"],
+                               n_counties_geo=r_geo["n_counties"],
+                               n_obs_geo=r_geo["n_obs"],
+                               logll_geo=r_geo["logll"])
                     row.update(gap_vs_geo=gap, se_gap=se_gap,
-                               z_gap=z_gap, p_gap_onesided=p_gap)
+                               z_gap=z_gap, p_gap_onesided=p_gap,
+                               lr_vs_geo=lr, p_lr_vs_geo=p_lr)
                 csv_rows.append(row)
         cols = ["sample","w_matrix","n_counties","n_obs",
                 "beta","se_beta","p_beta","lam","se_lam","p_lam",
-                "gap_vs_geo","se_gap","z_gap","p_gap_onesided"]
+                "lam_geo","se_lam_geo","p_lam_geo","n_counties_geo",
+                "n_obs_geo","logll_geo",
+                "gap_vs_geo","se_gap","z_gap","p_gap_onesided",
+                "lr_vs_geo","p_lr_vs_geo"]
         pd.DataFrame(csv_rows)[cols].to_csv(
             output_dir / "four_w_comparison_credit.csv", index=False)
         print(f"\nSaved four_w_comparison_credit.csv to {output_dir}")

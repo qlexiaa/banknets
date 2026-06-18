@@ -381,8 +381,13 @@ def build_sample(panel_sub, county_order, W_geo_all, W_bank_all,
         lambda g: g.isna().any().any()
     )
     sub_co     = set(panel_sub["fips5"].unique())
+    island_sets = []
+    for W_all in (W_geo_all, W_bank_all, W_knn3_all, W_knn4_all):
+        full_rs = np.array(W_all.sum(axis=1)).flatten()
+        island_sets.append({county_order[i] for i, r in enumerate(full_rs) if r == 0})
+    islands = set().union(*island_sets)
     usable     = [c for c in county_order
-                  if c in sub_co and not any_nan.get(c, True)]
+                  if c in sub_co and not any_nan.get(c, True) and c not in islands]
     N          = len(usable)
     usable_pos = {c: i for i, c in enumerate(usable)}
 
@@ -714,10 +719,20 @@ def load_lambdas(output_dir):
     sem_path = output_dir / "panel_fe_credit_results.csv"
     sem      = pd.read_csv(sem_path)
 
-    def get_sem_lam(model_str):
+    def get_sem_row(model_str):
         row = sem[sem["model"] == model_str]
         assert len(row) == 1, f"model '{model_str}' not found in {sem_path}"
-        return float(row["lam"].iloc[0])
+        return row.iloc[0]
+
+    def get_sem_lam(model_str):
+        return float(get_sem_row(model_str)["lam"])
+
+    def get_paired_geo_lam(sample_tag):
+        model_str = f"FE W_bank ({sample_tag})"
+        row = get_sem_row(model_str)
+        if "lam_geo" in row.index and not pd.isna(row["lam_geo"]):
+            return float(row["lam_geo"])
+        return get_sem_lam(f"FE W_geo ({sample_tag})")
 
     def get_sem_lam_soft(model_str, fallback_model=None):
         """Return lambda; fall back to fallback_model if not found."""
@@ -732,19 +747,19 @@ def load_lambdas(output_dir):
 
     return {
         "full": {
-            "geo" : get_sem_lam("FE W_geo (full)"),
+            "geo" : get_paired_geo_lam("full"),
             "bank": get_sem_lam("FE W_bank (full)"),
             "knn3": get_sem_lam_soft("FE W_bank_knn3 (full)"),
             "knn4": get_sem_lam_soft("FE W_bank_knn4 (full)"),
         },
         "contig": {
-            "geo" : get_sem_lam("FE W_geo (contig)"),
+            "geo" : get_paired_geo_lam("contig"),
             "bank": get_sem_lam("FE W_bank (contig)"),
             "knn3": get_sem_lam_soft("FE W_bank_knn3 (contig)"),
             "knn4": get_sem_lam_soft("FE W_bank_knn4 (contig)"),
         },
         "noncontig": {
-            "geo" : get_sem_lam("FE W_geo (noncontig)"),
+            "geo" : get_paired_geo_lam("noncontig"),
             "bank": get_sem_lam("FE W_bank (noncontig)"),
             "knn3": get_sem_lam_soft("FE W_bank_knn3 (noncontig)"),
             "knn4": get_sem_lam_soft("FE W_bank_knn4 (noncontig)"),

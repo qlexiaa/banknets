@@ -2,7 +2,8 @@
 Bank-network Moran's I diagnostics for credit-growth residuals.
 
 Builds residuals from the baseline credit-growth reduced form, then computes
-county-level Moran's I under alternative W_bank specifications.
+county-level and state-clustered Moran's I under alternative W_bank
+specifications.
 
 Outputs
 -------
@@ -27,7 +28,8 @@ from libpysal.weights import WSP
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from panel_data import CREDIT_CONTROLS  # noqa: E402
-from utils import gal_to_W, row_standardize  # noqa: E402
+from utils import row_standardize  # noqa: E402
+from w_variants import load_bank_variants, load_w_geo  # noqa: E402
 
 
 ROOT = Path(__file__).parents[2]
@@ -36,12 +38,10 @@ OUT_DIR = ROOT / "output" / "diagnostics"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
-GAL_PATH = ROOT / "data" / "W_geo_queen.gal"
-WBANK_BIN_PATH = ROOT / "data" / "W_bank_avg.npz"
-WBANK_COUNT_PATH = ROOT / "data" / "W_bank_count_avg.npz"
-WBANK_NONGEO_PATH = ROOT / "data" / "W_bank_nonGeo.npz"
+WBANK_1994_PATH = ROOT / "data" / "W_bank_1994.npz"
 
-K_VALUES = list(range(1, 21))
+K_VALUES = [3, 4]
+STATE_KNN_LABELS = {"W_bank_knn3", "W_bank_knn4"}
 PERMUTATIONS = 999
 
 
@@ -98,6 +98,23 @@ def trim_islands(W_sparse, labels):
         labels = labels[keep]
 
 
+def aggregate_to_state_matrix(W_sparse, county_order):
+    """Collapse county W to state clusters and row-standardize cross-state links."""
+    states = np.array([int(c[:2]) for c in county_order], dtype=int)
+    state_order = np.array(sorted(np.unique(states)), dtype=int)
+    state_to_idx = {state: i for i, state in enumerate(state_order)}
+    state_idx = np.array([state_to_idx[state] for state in states], dtype=int)
+
+    S = scipy.sparse.csr_matrix(
+        (np.ones(len(states)), (np.arange(len(states)), state_idx)),
+        shape=(len(states), len(state_order)),
+    )
+    W_state = (S.T @ W_sparse.tocsr() @ S).tocsr()
+    W_state.setdiag(0.0)
+    W_state.eliminate_zeros()
+    return state_order, row_standardize(W_state)
+
+
 def load_residuals():
     """Build baseline credit-growth residuals."""
     print("=" * 60)
@@ -137,7 +154,7 @@ def load_residuals():
 
 
 def load_w_matrices():
-    """Load W_geo baseline and W_bank matrices, then build KNN variants."""
+    """Load W_geo and all W_bank variants, then build the KNN grid."""
     print("\n" + "=" * 60)
     print("STEP 3: Loading W specifications")
     print("=" * 60)
@@ -147,19 +164,28 @@ def load_w_matrices():
         .tolist()
     )
 
-    W_geo, _ = gal_to_W(GAL_PATH, county_order)
-    W_bin = row_standardize(scipy.sparse.load_npz(WBANK_BIN_PATH))
-    W_count = row_standardize(scipy.sparse.load_npz(WBANK_COUNT_PATH))
-    W_nongeo = row_standardize(scipy.sparse.load_npz(WBANK_NONGEO_PATH))
+    W_geo, _ = load_w_geo(county_order)
+    bank_variants = load_bank_variants(county_order, W_geo_all=W_geo)
 
-    matrices = [
-        ("W_geo", W_geo),
-        ("W_bank_bin", W_bin),
-        ("W_bank_count", W_count),
-        ("W_bank_nonGeo", W_nongeo),
-    ]
+    matrices = [("W_geo", W_geo)]
+    matrices.extend(
+        (name, W)
+        for name, W in bank_variants.items()
+        if not name.startswith("W_bank_knn")
+    )
+
+    if WBANK_1994_PATH.exists():
+        W_1994 = row_standardize(scipy.sparse.load_npz(WBANK_1994_PATH))
+        if W_1994.shape != W_geo.shape:
+            raise ValueError(
+                f"{WBANK_1994_PATH.name} has shape {W_1994.shape}, "
+                f"expected {W_geo.shape}"
+            )
+        matrices.append(("W_bank_1994", W_1994))
+
+    W_bank = bank_variants["W_bank"]
     for k in K_VALUES:
-        matrices.append((f"W_bank_knn_{k}", build_wbank_knn(W_bin, k)))
+        matrices.append((f"W_bank_knn{k}", build_wbank_knn(W_bank, k)))
 
     for label, W in matrices:
         stats = matrix_stats(W)
@@ -172,36 +198,46 @@ def load_w_matrices():
     return county_order, matrices
 
 
-def moran_by_year(resid_df, county_order, W_sparse, w_label, w_stats):
+def moran_by_year(resid_df, id_col, unit_order, W_sparse, w_label, w_stats, level_label):
     """Compute Moran's I for one W matrix across years."""
     rows = []
-    county_to_idx = {c: i for i, c in enumerate(county_order)}
+    unit_order = np.asarray(unit_order)
+    unit_to_idx = {unit: i for i, unit in enumerate(unit_order)}
 
     for year in sorted(resid_df["year"].unique()):
         yr = resid_df[resid_df["year"] == year].copy()
-        yr["fips5"] = yr["county"].astype(int).astype(str).str.zfill(5)
 
-        present = [c for c in county_order if c in set(yr["fips5"])]
-        if len(present) < len(county_order) * 0.7:
-            print(f"  [{w_label}] {int(year)} skipped: {len(present)} counties")
+        present_ids = set(yr[id_col].dropna().values)
+        present = [unit for unit in unit_order if unit in present_ids]
+        if len(present) < len(unit_order) * 0.7:
+            print(
+                f"  [{level_label}/{w_label}] {int(year)} skipped: "
+                f"{len(present)} units"
+            )
             continue
 
-        idx = np.array([county_to_idx[c] for c in present])
-        kept_counties = np.array(present)
-        W_sub, kept_counties = trim_islands(W_sparse[idx, :][:, idx], kept_counties)
+        idx = np.array([unit_to_idx[unit] for unit in present])
+        kept_units = np.array(present)
+        W_sub, kept_units = trim_islands(W_sparse[idx, :][:, idx], kept_units)
 
-        if len(kept_counties) < 3:
-            print(f"  [{w_label}] {int(year)} skipped: too few non-islands")
+        if len(kept_units) < 3:
+            print(
+                f"  [{level_label}/{w_label}] {int(year)} skipped: "
+                "too few non-islands"
+            )
             continue
 
         w_pysal = WSP(W_sub.tocsr()).to_W(silence_warnings=True)
         y = (
-            yr.set_index("fips5")
-            .reindex(kept_counties)["residual"]
+            yr.set_index(id_col)
+            .reindex(kept_units)["residual"]
             .values.astype(float)
         )
         if np.nanstd(y) == 0:
-            print(f"  [{w_label}] {int(year)} skipped: zero residual variance")
+            print(
+                f"  [{level_label}/{w_label}] {int(year)} skipped: "
+                "zero residual variance"
+            )
             continue
 
         mi = Moran(y, w_pysal, permutations=PERMUTATIONS)
@@ -212,14 +248,14 @@ def moran_by_year(resid_df, county_order, W_sparse, w_label, w_stats):
             else ""
         )
         print(
-            f"  [{w_label}] {int(year)}: "
+            f"  [{level_label}/{w_label}] {int(year)}: "
             f"I={mi.I:+.4f}  z={mi.z_sim:+.2f}  "
-            f"p={mi.p_sim:.3f}  n={len(kept_counties)} {sig}"
+            f"p={mi.p_sim:.3f}  n={len(kept_units)} {sig}"
         )
 
         rows.append({
             "outcome": "credit",
-            "level": "county",
+            "level": level_label,
             "year": int(year),
             "w_matrix": w_label,
             "moran_I": mi.I,
@@ -227,7 +263,7 @@ def moran_by_year(resid_df, county_order, W_sparse, w_label, w_stats):
             "z_score": mi.z_sim,
             "p_value": mi.p_sim,
             "significant": mi.p_sim < 0.05,
-            "n_units": int(len(kept_counties)),
+            "n_units": int(len(kept_units)),
             **w_stats,
         })
 
@@ -238,16 +274,20 @@ def plot_selected(results, out_dir):
     """Plot selected W specifications by year."""
     selected = [
         "W_geo",
-        "W_bank_bin",
+        "W_bank",
         "W_bank_count",
+        "W_bank_binary",
         "W_bank_nonGeo",
-        "W_bank_knn_1",
-        "W_bank_knn_2",
-        "W_bank_knn_5",
-        "W_bank_knn_10",
-        "W_bank_knn_20",
+        "W_bank_interstate",
+        "W_bank_intrastate",
+        "W_bank_1994",
+        "W_bank_knn3",
+        "W_bank_knn4",
     ]
-    df = results[results["w_matrix"].isin(selected)].copy()
+    df = results[
+        (results["level"] == "county")
+        & (results["w_matrix"].isin(selected))
+    ].copy()
 
     fig, ax = plt.subplots(figsize=(12, 6))
     for w_label in selected:
@@ -283,15 +323,43 @@ def run(output_dir=None):
 
     residuals = load_residuals()
     county_order, matrices = load_w_matrices()
+    residuals = residuals.copy()
+    residuals["fips5"] = residuals["county"].astype(int).astype(str).str.zfill(5)
 
     print("\n" + "=" * 60)
-    print("STEP 4: Moran's I by year and W specification")
+    print("STEP 4: Moran's I by year and W specification -- county level")
     print("=" * 60)
     all_rows = []
     for w_label, W in matrices:
         print(f"  {w_label}:", flush=True)
         all_rows.extend(
-            moran_by_year(residuals, county_order, W, w_label, matrix_stats(W))
+            moran_by_year(
+                residuals, "fips5", county_order, W, w_label, matrix_stats(W),
+                "county",
+            )
+        )
+
+    print("\n" + "=" * 60)
+    print("STEP 5: Moran's I by year and W specification -- state clusters")
+    print("=" * 60)
+    state_residuals = (
+        residuals.groupby(["state", "year"], as_index=False)["residual"]
+        .mean()
+    )
+    state_residuals["outcome"] = "credit"
+    state_matrices = [
+        (w_label, W)
+        for w_label, W in matrices
+        if not w_label.startswith("W_bank_knn") or w_label in STATE_KNN_LABELS
+    ]
+    for w_label, W in state_matrices:
+        state_order, W_state = aggregate_to_state_matrix(W, county_order)
+        print(f"  {w_label}:", flush=True)
+        all_rows.extend(
+            moran_by_year(
+                state_residuals, "state", state_order, W_state, w_label,
+                matrix_stats(W_state), "state",
+            )
         )
 
     results = pd.DataFrame(all_rows)
@@ -306,8 +374,10 @@ def run(output_dir=None):
     results.to_csv(out / "moran_i_wbank_results.csv", index=False)
     print(f"\nResults saved -> {out / 'moran_i_wbank_results.csv'}")
 
+    matrix_order = {label: pos for pos, (label, _) in enumerate(matrices)}
+    level_order = {"county": 0, "state": 1}
     summary = (
-        results.groupby(["outcome", "w_matrix"], as_index=False)
+        results.groupby(["outcome", "level", "w_matrix"], as_index=False)
         .agg(
             mean_moran_I=("moran_I", "mean"),
             median_moran_I=("moran_I", "median"),
@@ -319,17 +389,31 @@ def run(output_dir=None):
             avg_nbrs=("avg_nbrs", "first"),
         )
     )
+    summary["_level_order"] = summary["level"].map(level_order)
+    summary["_order"] = summary["w_matrix"].map(matrix_order)
+    summary = (
+        summary.sort_values(["outcome", "_level_order", "_order"])
+        .drop(columns=["_level_order", "_order"])
+    )
     summary.to_csv(out / "moran_i_wbank_summary.csv", index=False)
     print(f"Summary saved -> {out / 'moran_i_wbank_summary.csv'}")
 
     plot_selected(results, out)
 
     print("\nMean Moran's I, sorted descending:")
-    top = summary.sort_values("mean_moran_I", ascending=False).head(8)
-    print(
-        top[["w_matrix", "mean_moran_I", "significant_years", "density", "avg_nbrs"]]
-        .to_string(index=False)
-    )
+    for level in ("county", "state"):
+        top = (
+            summary[summary["level"] == level]
+            .sort_values("mean_moran_I", ascending=False)
+            .head(8)
+        )
+        if top.empty:
+            continue
+        print(f"\n{level}:")
+        print(
+            top[["w_matrix", "mean_moran_I", "significant_years", "density", "avg_nbrs"]]
+            .to_string(index=False)
+        )
 
     return results, summary
 

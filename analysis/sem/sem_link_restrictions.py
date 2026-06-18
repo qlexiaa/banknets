@@ -116,8 +116,7 @@ def nongeo_matrix_stats(W_sp, label):
     )
 
 
-def build_arrays(panel_sub, county_order, W_all, years, year_pos, sample_label):
-    T = len(years)
+def usable_counties(panel_sub, county_order, W_all):
     any_nan = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
         lambda g: g.isna().any().any()
     )
@@ -129,6 +128,14 @@ def build_arrays(panel_sub, county_order, W_all, years, year_pos, sample_label):
         c for c in county_order
         if c in sub_co and not any_nan.get(c, True) and c not in islands
     ]
+    return usable
+
+
+def build_arrays(panel_sub, county_order, W_all, years, year_pos, sample_label,
+                 usable=None):
+    T = len(years)
+    usable = list(usable) if usable is not None else usable_counties(
+        panel_sub, county_order, W_all)
     N = len(usable)
     usable_pos = {c: i for i, c in enumerate(usable)}
 
@@ -156,7 +163,7 @@ def build_arrays(panel_sub, county_order, W_all, years, year_pos, sample_label):
 
     idx = np.array([county_order.index(c) for c in usable])
     W_sub = row_standardize(W_all[idx, :][:, idx])
-    return y_long, x_long, sparse_to_pysal_w(W_sub), N
+    return y_long, x_long, sparse_to_pysal_w(W_sub), N, tuple(usable)
 
 
 def run_fe(y, x, w, w_label, ds_label, years):
@@ -222,11 +229,20 @@ def estimate_variant(config, W_geo_all, W_bank_raw, W_variant_all,
         ("Contig",    panel_contig),
         ("NonContig", panel_noncontig),
     ]:
-        for w_label, W_all in [("W_geo", W_geo_all), (config["w_label"], W_variant_all)]:
-            print(f"  {sample_label} x {w_label} ...", flush=True)
-            y, x, w, N = build_arrays(panel_sub, county_order, W_all, years, year_pos, sample_label)
-            res = run_fe(y, x, w, w_label, sample_label, years)
-            rows.append(extract(res, N, T, f"{w_label} ({sample_label.lower()})"))
+        w_label = config["w_label"]
+        print(f"  {sample_label} x {w_label} ...", flush=True)
+        y_alt, x_alt, w_alt, N_alt, usable = build_arrays(
+            panel_sub, county_order, W_variant_all, years, year_pos, sample_label)
+        res_alt = run_fe(y_alt, x_alt, w_alt, w_label, sample_label, years)
+
+        print(f"  {sample_label} x W_geo (paired {w_label} sample) ...", flush=True)
+        y_geo, x_geo, w_geo, N_geo, _ = build_arrays(
+            panel_sub, county_order, W_geo_all, years, year_pos, sample_label,
+            usable=usable)
+        res_geo = run_fe(y_geo, x_geo, w_geo, "W_geo", sample_label, years)
+
+        rows.append(extract(res_geo, N_geo, T, f"W_geo ({sample_label.lower()})"))
+        rows.append(extract(res_alt, N_alt, T, f"{w_label} ({sample_label.lower()})"))
 
     print()
     print("=" * 90)

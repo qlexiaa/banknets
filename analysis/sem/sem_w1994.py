@@ -354,12 +354,14 @@ def _usable_counties(panel_sub, county_order, W_all_sp, dv="Dl_nloans_b"):
             if c in sub_co and not any_nan.get(c, True) and c not in islands]
 
 
-def _build_arrays(panel_sub, county_order, W_all_sp, YEARS, year_pos, sample_label):
+def _build_arrays(panel_sub, county_order, W_all_sp, YEARS, year_pos, sample_label,
+                  usable=None):
     """Build balanced long-format arrays; subset and row-standardise W to sample."""
     T   = len(YEARS)
     DV  = "Dl_nloans_b"
 
-    usable = _usable_counties(panel_sub, county_order, W_all_sp, dv=DV)
+    usable = list(usable) if usable is not None else _usable_counties(
+        panel_sub, county_order, W_all_sp, dv=DV)
     N     = len(usable)
     u_pos = {c: i for i, c in enumerate(usable)}
 
@@ -382,7 +384,7 @@ def _build_arrays(panel_sub, county_order, W_all_sp, YEARS, year_pos, sample_lab
 
     idx   = np.array([county_order.index(c) for c in usable])
     W_sub = row_standardize(W_all_sp[idx, :][:, idx])
-    return y_long, x_long, sparse_to_pysal_w(W_sub), N
+    return y_long, x_long, sparse_to_pysal_w(W_sub), N, tuple(usable)
 
 
 def _extract(res, N, T):
@@ -457,12 +459,12 @@ def run(output_dir=None):
     # ── SEM estimation ────────────────────────────────────────────────────────
     results  = {}
 
-    W_SPECS = [
-        ("W_geo",        W_geo_all),
+    BANK_W_SPECS = [
         ("W_bank_1994",  W_1994_rs_sp),
         ("W_bank_knn3",  W_knn3_all),
         ("W_bank_knn4",  W_knn4_all),
     ]
+    W_SPECS = [("W_geo", W_geo_all)] + BANK_W_SPECS
 
     W_COL = 86
     print()
@@ -476,11 +478,11 @@ def run(output_dir=None):
     print("-" * W_COL)
 
     for sample_label, panel_sub in samples:
-        for w_name, W_all in W_SPECS:
+        for w_name, W_all in BANK_W_SPECS:
             tag = f"{sample_label} x {w_name}"
             print(f"  Estimating {tag} ...", flush=True)
             try:
-                y, x, w_pysal, N = _build_arrays(
+                y, x, w_pysal, N, usable = _build_arrays(
                     panel_sub, county_order, W_all, YEARS, year_pos, sample_label)
                 nx = X_VARS + [f"yr{yr}" for yr in YEARS[1:]]
                 res = spreg.Panel_FE_Error(
@@ -489,6 +491,7 @@ def run(output_dir=None):
                     name_w=w_name, name_ds=sample_label,
                 )
                 r = _extract(res, N, T)
+                r["_usable_counties"] = usable
                 results[(sample_label, w_name)] = r
                 def _st(p):
                     if np.isnan(p): return ""
@@ -501,7 +504,65 @@ def run(output_dir=None):
                 print(f"  [SKIP] {tag}: {exc}")
                 results[(sample_label, w_name)] = None
 
+        base_bank = results.get((sample_label, "W_bank_1994"))
+        base_usable = None if base_bank is None else base_bank["_usable_counties"]
+        tag = f"{sample_label} x W_geo on W_bank_1994 counties"
+        print(f"  Estimating {tag} ...", flush=True)
+        try:
+            y, x, w_pysal, N, usable = _build_arrays(
+                panel_sub, county_order, W_geo_all, YEARS, year_pos,
+                sample_label, usable=base_usable)
+            nx = X_VARS + [f"yr{yr}" for yr in YEARS[1:]]
+            res = spreg.Panel_FE_Error(
+                y, x, w_pysal,
+                name_y="Dl_nloans_b", name_x=nx,
+                name_w="W_geo", name_ds=sample_label,
+            )
+            r = _extract(res, N, T)
+            r["_usable_counties"] = usable
+            results[(sample_label, "W_geo")] = r
+            def _st(p):
+                if np.isnan(p): return ""
+                return "***" if p < 0.01 else ("**" if p < 0.05 else ("*" if p < 0.10 else ""))
+            print(f"  {sample_label:<12} {'W_geo':<18} {r['n_co']:>5}  "
+                  f"{r['beta']:>8.4f}{_st(r['p_beta'])} {r['se_beta']:>6.4f}  "
+                  f"{r['lam']:>8.4f}{_st(r['p_lam'])} {r['se_lam']:>6.4f}  "
+                  f"{r['p_lam']:>8.4f}")
+        except Exception as exc:
+            print(f"  [SKIP] {tag}: {exc}")
+            results[(sample_label, "W_geo")] = None
+
         print()
+
+    paired_geo = {}
+    paired_geo_cache = {
+        (sample_label, r["_usable_counties"]): r
+        for sample_label, _ in samples
+        for r in [results.get((sample_label, "W_geo"))]
+        if r is not None
+    }
+    for sample_label, panel_sub in samples:
+        for cmp_w in ("W_bank_1994", "W_bank_knn3", "W_bank_knn4"):
+            r_cmp = results.get((sample_label, cmp_w))
+            if r_cmp is None:
+                paired_geo[(sample_label, cmp_w)] = None
+                continue
+            cache_key = (sample_label, r_cmp["_usable_counties"])
+            if cache_key not in paired_geo_cache:
+                print(f"  Estimating paired W_geo for {sample_label} x {cmp_w} sample ...", flush=True)
+                y, x, w_pysal, N, usable = _build_arrays(
+                    panel_sub, county_order, W_geo_all, YEARS, year_pos,
+                    sample_label, usable=r_cmp["_usable_counties"])
+                nx = X_VARS + [f"yr{yr}" for yr in YEARS[1:]]
+                res = spreg.Panel_FE_Error(
+                    y, x, w_pysal,
+                    name_y="Dl_nloans_b", name_x=nx,
+                    name_w="W_geo", name_ds=sample_label,
+                )
+                r_geo = _extract(res, N, T)
+                r_geo["_usable_counties"] = usable
+                paired_geo_cache[cache_key] = r_geo
+            paired_geo[(sample_label, cmp_w)] = paired_geo_cache[cache_key]
 
     # ── Lambda gap tests ──────────────────────────────────────────────────────
     print()
@@ -511,7 +572,7 @@ def run(output_dir=None):
         print("-" * 24)
 
         for sample_label, _ in samples:
-            r_geo = results.get((sample_label, "W_geo"))
+            r_geo = paired_geo.get((sample_label, cmp_w))
             r_cmp = results.get((sample_label, cmp_w))
             g = _gap_test(r_geo, r_cmp)
             print(f"  {sample_label:<12} {g['gap_lam']:>8.4f}")
@@ -543,13 +604,26 @@ def run(output_dir=None):
                     continue
                 # Gap test: compare this W vs W_geo (only for non-geo rows)
                 if w_name in ("W_bank_1994", "W_bank_knn3", "W_bank_knn4"):
+                    r_geo = paired_geo.get((sample_label, w_name))
                     g = _gap_test(
-                        results.get((sample_label, "W_geo")),
+                        r_geo,
                         results.get((sample_label, w_name))
+                    )
+                    geo_fields = dict(
+                        lam_geo=r_geo["lam"] if r_geo is not None else np.nan,
+                        se_lam_geo=r_geo["se_lam"] if r_geo is not None else np.nan,
+                        p_lam_geo=r_geo["p_lam"] if r_geo is not None else np.nan,
+                        n_co_geo=r_geo["n_co"] if r_geo is not None else np.nan,
+                        n_obs_geo=r_geo["n_obs"] if r_geo is not None else np.nan,
                     )
                 else:
                     g = {k: np.nan for k in
                          ("gap_lam", "se_gap", "z_gap", "p_gap_onesided")}
+                    geo_fields = dict(
+                        lam_geo=r["lam"], se_lam_geo=r["se_lam"],
+                        p_lam_geo=r["p_lam"], n_co_geo=r["n_co"],
+                        n_obs_geo=r["n_obs"],
+                    )
                 # Network-persistence stats apply only to W_bank_1994
                 p = (persist_by_sample.get(sample_label, {})
                      if w_name == "W_bank_1994" else {})
@@ -563,6 +637,7 @@ def run(output_dir=None):
                         "n_co", "n_obs"]},
                     **{k: g[k] for k in
                        ["gap_lam", "se_gap", "z_gap", "p_gap_onesided"]},
+                    **geo_fields,
                     # Network persistence applies only to W_bank_1994 rows.
                     n_hcs_1994        = n_hcs_1994 if w_name == "W_bank_1994" else np.nan,
                     corr_1994_avg_rs  = p.get("corr_rs",      np.nan),
