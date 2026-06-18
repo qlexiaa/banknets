@@ -730,6 +730,7 @@ def appendix_a1_a4(df):
 
     INSTR  = "Linter_bra"
     border = df["border"] == 1
+    noncontig = df["border"] == 0
 
     # ── Table A1: Credit Supply – Border Counties ─────────────────────
     print("\nTable A1, Panel A: Commercial Banks (Border Counties)")
@@ -757,6 +758,33 @@ def appendix_a1_a4(df):
         rows_a1.append({"dep": var, "panel": "A1_Placebo_Border",
                         "coef": b, "se": se, "pval": p, "N": int(res.nobs)})
     save_table_csv(rows_a1, "table_A1.csv")
+
+    # Non-contiguous counterpart to Table A1.
+    print("\nTable A1, Panel A: Commercial Banks (Non-contiguous Counties)")
+    rows_a1_noncontig = []
+    for var in ["Dl_nloans_b","Dl_vloans_b","Dl_nden_b","Dl_lir_b","Dl_nsold_b"]:
+        lag   = f"L{var}"
+        indep = [INSTR] + D_CTL + ([lag] if lag in df.columns else []) + YR
+        indep = [c for c in indep if c in df.columns]
+        res   = fe_reg(df, var, indep, mask=noncontig)
+        b, se, p = (res.params.get(INSTR), res.std_errors.get(INSTR),
+                    res.pvalues.get(INSTR))
+        print(f"  {var:<24} {b:.3f}{_stars(p):<3} ({se:.3f})  N={int(res.nobs):,}")
+        rows_a1_noncontig.append({"dep": var, "panel": "A1_Banks_NonContig",
+                                  "coef": b, "se": se, "pval": p, "N": int(res.nobs)})
+
+    print("\nTable A1, Panel B: Placebo Lenders (Non-contiguous Counties)")
+    for var in ["Dl_nloans_pl","Dl_vloans_pl","Dl_nden_pl","Dl_lir_pl","Dl_nsold_pl"]:
+        lag   = f"L{var}"
+        indep = [INSTR] + D_CTL + ([lag] if lag in df.columns else []) + YR
+        indep = [c for c in indep if c in df.columns]
+        res   = fe_reg(df, var, indep, mask=noncontig)
+        b, se, p = (res.params.get(INSTR), res.std_errors.get(INSTR),
+                    res.pvalues.get(INSTR))
+        print(f"  {var:<24} {b:.3f}{_stars(p):<3} ({se:.3f})  N={int(res.nobs):,}")
+        rows_a1_noncontig.append({"dep": var, "panel": "A1_Placebo_NonContig",
+                                  "coef": b, "se": se, "pval": p, "N": int(res.nobs)})
+    save_table_csv(rows_a1_noncontig, "table_A1_noncontig.csv")
 
     # ── Table A3: House Prices Reduced Form – Border Counties ─────────
     print("\nTable A3: House Prices Reduced Form (Border Counties)")

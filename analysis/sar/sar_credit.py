@@ -95,10 +95,11 @@ def run(output_dir=None):
     T        = len(YEARS)
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
 
-    W_MATRICES = [("W_geo", W_geo_all)] + list(bank_variants.items())
+    BANK_MATRICES = list(bank_variants.items())
+    W_MATRICES = [("W_geo", W_geo_all)] + BANK_MATRICES
 
     # ── Build arrays for one (panel_sub, W_all) combination ──────────────────
-    def _build(panel_sub, W_all, sample_label):
+    def _usable_counties(panel_sub, W_all):
         DV      = "Dl_nloans_b"
         any_nan = panel_sub.groupby("fips5")[[DV] + X_VARS].apply(
             lambda g: g.isna().any().any()
@@ -106,8 +107,12 @@ def run(output_dir=None):
         sub_co  = set(panel_sub["fips5"].unique())
         full_rs = np.array(W_all.sum(axis=1)).flatten()
         islands = {county_order[i] for i, r in enumerate(full_rs) if r == 0}
-        usable  = [c for c in county_order
-                   if c in sub_co and not any_nan.get(c, True) and c not in islands]
+        return [c for c in county_order
+                if c in sub_co and not any_nan.get(c, True) and c not in islands]
+
+    def _build(panel_sub, W_all, sample_label, usable=None):
+        DV      = "Dl_nloans_b"
+        usable  = list(usable) if usable is not None else _usable_counties(panel_sub, W_all)
         N       = len(usable)
         u_pos   = {c: i for i, c in enumerate(usable)}
         df = (panel_sub[panel_sub["fips5"].isin(set(usable))]
@@ -123,20 +128,58 @@ def run(output_dir=None):
         assert not np.isnan(x_long).any()
         idx     = np.array([county_order.index(c) for c in usable])
         W_sub   = row_standardize(W_all[idx, :][:, idx])
-        return y_long, x_long, sparse_to_pysal_w(W_sub), N
+        return y_long, x_long, sparse_to_pysal_w(W_sub), N, tuple(usable)
 
     # ── Estimate ──────────────────────────────────────────────────────────────
     results = {}
     for sample_label, panel_sub in get_samples(panel):
-        for w_name, W_all in W_MATRICES:
+        for w_name, W_all in BANK_MATRICES:
             print(f"Estimating SAR ({sample_label}, {w_name}) ...", flush=True)
             try:
-                y, x, w, N = _build(panel_sub, W_all, sample_label)
+                y, x, w, N, usable = _build(panel_sub, W_all, sample_label)
                 res = run_panel_fe_lag(y, x, w, w_name, sample_label, YEARS)
                 results[(sample_label, w_name)] = extract_lag(res, N, T)
+                results[(sample_label, w_name)]["_usable_counties"] = usable
             except Exception as exc:
                 print(f"  [SKIP] {sample_label} x {w_name}: {exc}")
                 results[(sample_label, w_name)] = None
+
+        base_bank = results.get((sample_label, "W_bank"))
+        base_usable = None if base_bank is None else base_bank["_usable_counties"]
+        print(f"Estimating SAR ({sample_label}, W_geo on W_bank counties) ...", flush=True)
+        try:
+            y, x, w, N, usable = _build(
+                panel_sub, W_geo_all, sample_label, usable=base_usable)
+            res = run_panel_fe_lag(y, x, w, "W_geo", sample_label, YEARS)
+            results[(sample_label, "W_geo")] = extract_lag(res, N, T)
+            results[(sample_label, "W_geo")]["_usable_counties"] = usable
+        except Exception as exc:
+            print(f"  [SKIP] {sample_label} x W_geo: {exc}")
+            results[(sample_label, "W_geo")] = None
+
+    paired_geo = {}
+    paired_geo_cache = {
+        (sample_label, r["_usable_counties"]): r
+        for sample_label, _ in get_samples(panel)
+        for r in [results.get((sample_label, "W_geo"))]
+        if r is not None
+    }
+    for sample_label, panel_sub in get_samples(panel):
+        for w_name in bank_variants:
+            r_bank = results.get((sample_label, w_name))
+            if r_bank is None:
+                paired_geo[(sample_label, w_name)] = None
+                continue
+            cache_key = (sample_label, r_bank["_usable_counties"])
+            if cache_key not in paired_geo_cache:
+                print(f"Estimating paired SAR W_geo ({sample_label}, {w_name} sample) ...", flush=True)
+                y, x, w, N, usable = _build(
+                    panel_sub, W_geo_all, sample_label, usable=r_bank["_usable_counties"])
+                res = run_panel_fe_lag(y, x, w, "W_geo", sample_label, YEARS)
+                r_geo = extract_lag(res, N, T)
+                r_geo["_usable_counties"] = usable
+                paired_geo_cache[cache_key] = r_geo
+            paired_geo[(sample_label, w_name)] = paired_geo_cache[cache_key]
 
     # ── Gap statistics (same formula as lambda gap in sem_credit.py) ─────
     def gap_stat(r_geo, r_bank, one_sided=True):
@@ -162,7 +205,6 @@ def run(output_dir=None):
 
     w_keys = ["W_geo"] + list(bank_variants.keys())
     for sample_label, _ in get_samples(panel):
-        r_geo = results.get((sample_label, "W_geo"))
         for w_name in w_keys:
             r = results.get((sample_label, w_name))
             if r is None:
@@ -180,15 +222,27 @@ def run(output_dir=None):
     # ── Build CSV rows ─────────────────────────────────────────────────────────
     csv_rows = []
     for sample_label, _ in get_samples(panel):
-        r_geo = results.get((sample_label, "W_geo"))
         for w_name in w_keys:
             r = results.get((sample_label, w_name))
             if r is None:
                 continue
+            r_geo = r if w_name == "W_geo" else paired_geo.get((sample_label, w_name))
             if r_geo is not None and w_name != "W_geo":
                 gap_val, se_gap_val, z_gap_val, _ = gap_stat(r_geo, r)
             else:
                 gap_val, se_gap_val, z_gap_val = np.nan, np.nan, np.nan
+            if r_geo is None:
+                geo_fields = dict(
+                    rho_geo=np.nan, rho_geo_se=np.nan,
+                    beta_D_geo=np.nan, beta_D_geo_se=np.nan,
+                    n_counties_geo=np.nan, n_obs_geo=np.nan,
+                )
+            else:
+                geo_fields = dict(
+                    rho_geo=r_geo["rho"], rho_geo_se=r_geo["rho_se"],
+                    beta_D_geo=r_geo["beta_D"], beta_D_geo_se=r_geo["se_beta_D"],
+                    n_counties_geo=r_geo["n_co"], n_obs_geo=r_geo["n_obs"],
+                )
             csv_rows.append(dict(
                 sample     = sample_label,
                 w_matrix   = w_name,
@@ -198,6 +252,7 @@ def run(output_dir=None):
                 rho_se     = r["rho_se"],
                 beta_D     = r["beta_D"],
                 beta_D_se  = r["se_beta_D"],
+                **geo_fields,
                 delta_rho    = gap_val,
                 delta_rho_se = se_gap_val,
                 z_stat       = z_gap_val,
@@ -206,6 +261,8 @@ def run(output_dir=None):
     if output_dir is not None:
         cols = ["sample", "w_matrix", "n_counties", "n_obs",
                 "rho", "rho_se", "beta_D", "beta_D_se",
+                "rho_geo", "rho_geo_se", "beta_D_geo", "beta_D_geo_se",
+                "n_counties_geo", "n_obs_geo",
                 "delta_rho", "delta_rho_se", "z_stat"]
         pd.DataFrame(csv_rows)[cols].to_csv(
             output_dir / "sar_robustness_credit.csv", index=False)

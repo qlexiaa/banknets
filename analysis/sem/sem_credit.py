@@ -44,7 +44,7 @@ import spreg
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa: applies spreg Panel_FE_Error compatibility patch
 from utils import row_standardize, sparse_to_pysal_w
-from panel_data import CREDIT_CONTROLS, load_panel_with_credit, build_arrays, get_samples
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit, get_samples
 from w_variants import load_w_geo, load_bank_variants
 
 ROOT        = Path(__file__).parents[2]
@@ -78,10 +78,7 @@ def extract(res, N, T):
                 n_co=N,    n_obs=N * T)
 
 
-def _build_arrays_variant(panel_sub, county_order, W_all, YEARS, year_pos,
-                          sample_label, w_label):
-    """Build long-format arrays for a variant W, reusing panel_data.build_arrays logic."""
-    T       = len(YEARS)
+def _usable_counties(panel_sub, county_order, W_all):
     DV      = "Dl_nloans_b"
     nan_y   = panel_sub.groupby("fips5")[DV].apply(lambda s: s.isna().any())
     nan_x   = panel_sub.groupby("fips5")[X_VARS].apply(lambda g: g.isna().any().any())
@@ -98,10 +95,23 @@ def _build_arrays_variant(panel_sub, county_order, W_all, YEARS, year_pos,
         c for c in before_controls
         if not nan_x.get(c, True)
     ]
+    return usable, len(before_controls)
+
+
+def _build_arrays_variant(panel_sub, county_order, W_all, YEARS, year_pos,
+                          sample_label, w_label, usable=None):
+    """Build long-format arrays for a variant W, reusing panel_data.build_arrays logic."""
+    T       = len(YEARS)
+    DV      = "Dl_nloans_b"
+    if usable is None:
+        usable, before_n = _usable_counties(panel_sub, county_order, W_all)
+    else:
+        usable = list(usable)
+        before_n = len(usable)
     N      = len(usable)
     u_pos  = {c: i for i, c in enumerate(usable)}
     print(
-        f"    N before controls={len(before_controls)} | "
+        f"    N before controls={before_n} | "
         f"after control NaN-drop={N} ({sample_label} x {w_label})",
         flush=True,
     )
@@ -124,7 +134,7 @@ def _build_arrays_variant(panel_sub, county_order, W_all, YEARS, year_pos,
 
     idx   = np.array([county_order.index(c) for c in usable])
     W_sub = row_standardize(W_all[idx, :][:, idx])
-    return y_long, x_long, sparse_to_pysal_w(W_sub), N
+    return y_long, x_long, sparse_to_pysal_w(W_sub), N, tuple(usable)
 
 
 # ── Master run ────────────────────────────────────────────────────────────────
@@ -155,30 +165,59 @@ def run(output_dir=None):
     results = {}
 
     for sample_label, panel_sub in samples:
-        # W_geo benchmark
-        print(f"  Estimating: {sample_label} x W_geo ...", flush=True)
-        try:
-            y, x, w, N = _build_arrays_variant(
-                panel_sub, county_order, W_geo_all, YEARS, year_pos,
-                sample_label, "W_geo")
-            res = run_panel_fe(y, x, w, "W_geo", sample_label, YEARS)
-            results[(sample_label, "W_geo")] = extract(res, N, T)
-        except Exception as exc:
-            print(f"  [SKIP] {sample_label} x W_geo: {exc}")
-            results[(sample_label, "W_geo")] = None
-
         # All bank variants
         for w_name, W_all in bank_variants.items():
             print(f"  Estimating: {sample_label} x {w_name} ...", flush=True)
             try:
-                y, x, w, N = _build_arrays_variant(
+                y, x, w, N, usable = _build_arrays_variant(
                     panel_sub, county_order, W_all, YEARS, year_pos,
                     sample_label, w_name)
                 res = run_panel_fe(y, x, w, w_name, sample_label, YEARS)
                 results[(sample_label, w_name)] = extract(res, N, T)
+                results[(sample_label, w_name)]["_usable_counties"] = usable
             except Exception as exc:
                 print(f"  [SKIP] {sample_label} x {w_name}: {exc}")
                 results[(sample_label, w_name)] = None
+
+        # Displayed W_geo benchmark is built on the base W_bank county set.
+        base_bank = results.get((sample_label, "W_bank"))
+        base_usable = None if base_bank is None else base_bank["_usable_counties"]
+        print(f"  Estimating: {sample_label} x W_geo on W_bank counties ...", flush=True)
+        try:
+            y, x, w, N, usable = _build_arrays_variant(
+                panel_sub, county_order, W_geo_all, YEARS, year_pos,
+                sample_label, "W_geo", usable=base_usable)
+            res = run_panel_fe(y, x, w, "W_geo", sample_label, YEARS)
+            results[(sample_label, "W_geo")] = extract(res, N, T)
+            results[(sample_label, "W_geo")]["_usable_counties"] = usable
+        except Exception as exc:
+            print(f"  [SKIP] {sample_label} x W_geo: {exc}")
+            results[(sample_label, "W_geo")] = None
+
+    paired_geo = {}
+    paired_geo_cache = {
+        (sample_label, r["_usable_counties"]): r
+        for sample_label, _ in samples
+        for r in [results.get((sample_label, "W_geo"))]
+        if r is not None
+    }
+    for sample_label, panel_sub in samples:
+        for w_name in bank_variants:
+            r_bank = results.get((sample_label, w_name))
+            if r_bank is None:
+                paired_geo[(sample_label, w_name)] = None
+                continue
+            cache_key = (sample_label, r_bank["_usable_counties"])
+            if cache_key not in paired_geo_cache:
+                print(f"  Estimating paired W_geo: {sample_label} x {w_name} sample ...", flush=True)
+                y, x, w, N, usable = _build_arrays_variant(
+                    panel_sub, county_order, W_geo_all, YEARS, year_pos,
+                    sample_label, "W_geo", usable=r_bank["_usable_counties"])
+                res = run_panel_fe(y, x, w, "W_geo", sample_label, YEARS)
+                r_geo = extract(res, N, T)
+                r_geo["_usable_counties"] = usable
+                paired_geo_cache[cache_key] = r_geo
+            paired_geo[(sample_label, w_name)] = paired_geo_cache[cache_key]
 
     # ── Lambda gap tests ──────────────────────────────────────────────────────
     def gap_test(r_geo, r_bank):
@@ -222,17 +261,20 @@ def run(output_dir=None):
         print()
 
     print()
-    print("Lambda gap (W_bank_* vs W_geo) -- H1: lam_bank > lam_geo (one-sided):")
-    print(f"{'Sample':<12} {'W variant':<22} {'gap':>7} {'se_gap':>7} "
+    print("Lambda gap (W_bank_* vs same-sample W_geo) -- H1: lam_bank > lam_geo (one-sided):")
+    print(f"{'Sample':<12} {'W variant':<22} {'N_geo':>6} {'lam_geo':>8} {'gap':>7} {'se_gap':>7} "
           f"{'z_gap':>7} {'p(1-tail)':>10} {'sig':>5}")
-    print("-" * 72)
+    print("-" * 90)
 
     for sample_label, _ in samples:
-        r_geo = results.get((sample_label, "W_geo"))
         for w_name in bank_variants:
             r_bank = results.get((sample_label, w_name))
+            r_geo = paired_geo.get((sample_label, w_name))
             gap, se_gap, z_gap, p_gap = gap_test(r_geo, r_bank)
-            print(f"{sample_label:<12} {w_name:<22} {gap:>7.4f} {se_gap:>7.4f} "
+            if r_geo is None:
+                continue
+            print(f"{sample_label:<12} {w_name:<22} {r_geo['n_co']:>6} {r_geo['lam']:>8.4f} "
+                  f"{gap:>7.4f} {se_gap:>7.4f} "
                   f"{z_gap:>7.3f} {p_gap:>10.4f} {stars(p_gap):>5}")
         print()
 
@@ -247,6 +289,31 @@ def run(output_dir=None):
                 r = results.get((sample_label, w_name))
                 if r is None:
                     continue
+                r_geo = r if w_name == "W_geo" else paired_geo.get((sample_label, w_name))
+                if r_geo is None:
+                    geo_fields = dict(
+                        lam_geo=np.nan, se_lam_geo=np.nan, p_lam_geo=np.nan,
+                        n_co_geo=np.nan, n_obs_geo=np.nan,
+                        gap_vs_geo=np.nan, se_gap=np.nan, z_gap=np.nan,
+                        p_gap_onesided=np.nan,
+                    )
+                elif w_name == "W_geo":
+                    geo_fields = dict(
+                        lam_geo=r_geo["lam"], se_lam_geo=r_geo["se_lam"],
+                        p_lam_geo=r_geo["p_lam"],
+                        n_co_geo=r_geo["n_co"], n_obs_geo=r_geo["n_obs"],
+                        gap_vs_geo=np.nan, se_gap=np.nan, z_gap=np.nan,
+                        p_gap_onesided=np.nan,
+                    )
+                else:
+                    gap, se_gap, z_gap, p_gap = gap_test(r_geo, r)
+                    geo_fields = dict(
+                        lam_geo=r_geo["lam"], se_lam_geo=r_geo["se_lam"],
+                        p_lam_geo=r_geo["p_lam"],
+                        n_co_geo=r_geo["n_co"], n_obs_geo=r_geo["n_obs"],
+                        gap_vs_geo=gap, se_gap=se_gap, z_gap=z_gap,
+                        p_gap_onesided=p_gap,
+                    )
                 rows.append(dict(
                     model    = f"FE {w_name} ({sample_label.lower()})",
                     sample   = sample_label,
@@ -255,6 +322,7 @@ def run(output_dir=None):
                        ["beta","se_beta","z_beta","p_beta",
                         "lam","se_lam","z_lam","p_lam",
                         "n_co","n_obs"]},
+                    **geo_fields,
                 ))
         pd.DataFrame(rows).to_csv(
             output_dir / "panel_fe_credit_results.csv", index=False)

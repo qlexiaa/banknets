@@ -250,6 +250,9 @@ z_gap = (lambda_hat_alt - lambda_hat_geo) / sqrt(SE(lambda_hat_alt)^2 + SE(lambd
 p_gap = Phi(-z_gap)
 ```
 
+For bank-W rows, `lambda_hat_geo` is re-estimated on the same usable county
+list as the bank-W model before computing the gap.
+
 **Likelihood-ratio test** (also reported):
 ```
 LR = 2 * (logLL_alt - logLL_geo) ~ chi^2(1) under H0
@@ -277,11 +280,13 @@ LR = 2 * (logLL_alt - logLL_geo) ~ chi^2(1) under H0
             "W matrix": r["w_matrix"],
             "beta": f"{fmt(r['beta'])} ({fmt(r['se_beta'])}){stars(r['p_beta'])}",
             "lambda": f"{fmt(r['lam'])} ({fmt(r['se_lam'])}){stars(r['p_lam'])}",
+            "paired lambda_geo": "--" if r["w_matrix"] == "W_geo"
+            else f"{fmt(r.get('lam_geo', np.nan))} ({safe_int(r.get('n_counties_geo', np.nan))})",
             "delta_lambda vs W_geo": gap_str,
             "N obs": safe_int(r["n_obs"]),
         })
     s += md_table(pd.DataFrame(rows))
-    s += "\n*Standard errors in parentheses. Gap is one-sided z-test (H1: lambda_alt > lambda_geo).*\n"
+    s += "\n*Standard errors in parentheses. Paired lambda_geo reports lambda with geo N in parentheses. Gap is one-sided z-test (H1: lambda_alt > lambda_geo).*\n"
     return s
 
 
@@ -790,7 +795,7 @@ W_bank_knn_k[i, :] retains only the top-k entries of W_bank[i, :]
 
 followed by row-standardisation. k sweeps from 1 to 20.
 
-**Purpose:** Finds the crossover k where lambda_knn(k) > lambda_geo, establishing the bank-network density at which spatial error dependence matches geographic contiguity.
+**Purpose:** Finds the crossover k where lambda_knn(k) > lambda_geo, establishing the bank-network density at which spatial error dependence matches geographic contiguity. `lambda_geo` is estimated in the KNN sweep script with the same credit controls and fixed effects.
 
 **Density** = non-zero off-diagonal links / (N * (N-1))
 
@@ -1072,7 +1077,8 @@ Credit outcome only.
 
 """
     non_knn = df[~df["w_matrix"].str.contains("knn", na=False)].copy()
-    rows = [{"Outcome": r["outcome"], "W matrix": r["w_matrix"],
+    rows = [{"Outcome": r["outcome"], "Level": r.get("level", "county"),
+              "W matrix": r["w_matrix"],
               "Mean Moran's I": fmt(r["mean_moran_I"]),
               "Median Moran's I": fmt(r["median_moran_I"]),
               "Sig. years": f"{safe_int(r['significant_years'])}/{safe_int(r['n_years'])}",
@@ -1080,19 +1086,26 @@ Credit outcome only.
              for _, r in non_knn.iterrows()]
     s += md_table(pd.DataFrame(rows))
 
-    # KNN rows for k = 1, 2, 4, 8, 15, 20
-    KNN_SHOW = [1, 2, 4, 8, 15, 20]
+    # KNN rows for k = 3 and 4.
+    KNN_SHOW = [3, 4]
     knn_df = df[df["w_matrix"].str.contains("knn", na=False)].copy()
     # Extract k value
     if not knn_df.empty:
         knn_df = knn_df.copy()
         knn_df["_k"] = knn_df["w_matrix"].str.extract(r"knn(\d+)").astype(float)
-        knn_df = knn_df[knn_df["_k"].isin(KNN_SHOW)].sort_values("_k")
+        if "level" not in knn_df.columns:
+            knn_df["level"] = "county"
+        knn_df["_level_order"] = knn_df["level"].map({"county": 0, "state": 1})
+        knn_df = (
+            knn_df[knn_df["_k"].isin(KNN_SHOW)]
+            .sort_values(["_level_order", "_k"])
+        )
         if not knn_df.empty:
-            s += "\n**KNN matrices (k = 1, 2, 4, 8, 15, 20):**\n\n"
+            s += "\n**KNN matrices (k = 3, 4):**\n\n"
             knn_rows = []
             for _, r in knn_df.iterrows():
                 knn_rows.append({
+                    "Level": r.get("level", "county"),
                     "W matrix": r["w_matrix"],
                     "k": safe_int(r["_k"]),
                     "Mean Moran's I": fmt(r["mean_moran_I"]),

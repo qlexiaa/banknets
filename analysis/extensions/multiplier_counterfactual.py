@@ -51,6 +51,48 @@ PLOT_WS    = ["W_geo", "W_bank", "W_bank_binary", "W_bank_knn4"]
 
 
 # ==============================================================================
+# Input shaping
+# ==============================================================================
+
+def _use_paired_geo_rows(sar):
+    """
+    Replace standalone W_geo rows with the paired W_geo estimates stored on the
+    W_bank row, so plotted counterfactuals use matched county sets.
+    """
+    paired_cols = {
+        "rho_geo", "rho_geo_se", "beta_D_geo", "beta_D_geo_se",
+        "n_counties_geo", "n_obs_geo",
+    }
+    if not paired_cols.issubset(sar.columns):
+        return sar
+
+    out = []
+    for sample, sub in sar.groupby("sample", sort=False):
+        primary = sub[
+            (sub["w_matrix"] == "W_bank")
+            & sub["rho_geo"].notna()
+            & sub["beta_D_geo"].notna()
+        ]
+        if len(primary) == 0:
+            out.append(sub)
+            continue
+
+        geo = primary.iloc[0].copy()
+        geo["w_matrix"] = "W_geo"
+        geo["rho"] = geo["rho_geo"]
+        geo["rho_se"] = geo["rho_geo_se"]
+        geo["beta_D"] = geo["beta_D_geo"]
+        geo["beta_D_se"] = geo["beta_D_geo_se"]
+        geo["n_counties"] = geo["n_counties_geo"]
+        geo["n_obs"] = geo["n_obs_geo"]
+
+        out.append(pd.DataFrame([geo]))
+        out.append(sub[sub["w_matrix"] != "W_geo"])
+
+    return pd.concat(out, ignore_index=True)
+
+
+# ==============================================================================
 # Multiplier analytics
 # ==============================================================================
 
@@ -197,6 +239,7 @@ def run(output_dir=None):
     if not required_cols.issubset(sar.columns):
         print(f"[SKIP] {SAR_CSV} missing columns: {required_cols - set(sar.columns)}")
         return []
+    sar = _use_paired_geo_rows(sar)
 
     csv_rows = []
     W_print  = 88
@@ -205,7 +248,7 @@ def run(output_dir=None):
     print("SAR Spatial Multiplier Decomposition (Lesage & Pace 2009)")
     print("Unit shock: deltaD = 1 for all counties  |  Row-stochastic W: M = 1/(1-rho)")
     print("=" * W_print)
-    print(f"{'Sample':<10} {'W':<22} {'rho':>7} {'beta_D':>8}  "
+    print(f"{'Sample':<10} {'W':<22} {'N':>6} {'rho':>7} {'beta_D':>8}  "
           f"{'M':>6} {'direct':>8} {'indirect':>9} {'total':>8}  "
           f"{'total [90%CI]':<22}")
     print("-" * W_print)
@@ -213,6 +256,8 @@ def run(output_dir=None):
     for _, row in sar.iterrows():
         samp   = row["sample"]
         w_name = row["w_matrix"]
+        n_co   = int(row["n_counties"]) if "n_counties" in row and pd.notna(row["n_counties"]) else np.nan
+        n_obs  = int(row["n_obs"]) if "n_obs" in row and pd.notna(row["n_obs"]) else np.nan
         rho    = float(row["rho"])
         rho_se = float(row["rho_se"])
         beta   = float(row["beta_D"])
@@ -229,13 +274,15 @@ def run(output_dir=None):
         p95_tot = boot["p95_tot"] if boot else np.nan
         ci_str  = f"[{p5_tot:+.4f}, {p95_tot:+.4f}]" if boot else "n/a"
 
-        print(f"{samp:<10} {w_name:<22} {rho:>7.4f} {beta:>8.4f}  "
+        print(f"{samp:<10} {w_name:<22} {n_co:>6} {rho:>7.4f} {beta:>8.4f}  "
               f"{M:>6.3f} {direct:>8.4f} {indirect:>9.4f} {total:>8.4f}  "
               f"{ci_str}")
 
         row_dict = dict(
             sample        = samp,
             w_matrix      = w_name,
+            n_counties    = n_co,
+            n_obs         = n_obs,
             rho           = rho,
             rho_se        = rho_se,
             beta_D        = beta,
@@ -273,7 +320,8 @@ def run(output_dir=None):
 
     # -- Save CSV -------------------------------------------------------------
     if output_dir and csv_rows:
-        cols = ["sample", "w_matrix", "rho", "rho_se", "beta_D", "beta_D_se",
+        cols = ["sample", "w_matrix", "n_counties", "n_obs",
+                "rho", "rho_se", "beta_D", "beta_D_se",
                 "multiplier",
                 "point_direct", "point_indirect", "point_total",
                 "n_boot_draws",
