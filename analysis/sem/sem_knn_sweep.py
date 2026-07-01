@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa
 from utils import row_standardize, sparse_to_pysal_w
 from panel_data import CREDIT_CONTROLS, load_panel_with_credit
-from w_variants import load_w_geo
+from w_variants import load_w_geo, _build_reweighted_from_knn, _build_binary
 
 ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
@@ -43,8 +43,8 @@ def empty_estimate():
     return dict(lam=np.nan, se_lam=np.nan, n_co=np.nan, n_obs=np.nan)
 
 
-def build_wbank_knn(W_sparse, k, binary=False):
-    """Keep top-k weights per row, re-standardise. Returns scipy CSR."""
+def build_wbank_knn(W_sparse, k):
+    """Keep top-k weights per row (cosine-ranked), re-standardise. Returns scipy CSR."""
     W = W_sparse.toarray().astype(np.float64)
     np.fill_diagonal(W, 0.0)
     N = W.shape[0]
@@ -58,7 +58,7 @@ def build_wbank_knn(W_sparse, k, binary=False):
             keep = np.flatnonzero(row)
         else:
             keep = np.argpartition(row, -k)[-k:]
-        W_knn[i, keep] = 1.0 if binary else row[keep]
+        W_knn[i, keep] = row[keep]
     np.fill_diagonal(W_knn, 0.0)
     rs = W_knn.sum(axis=1, keepdims=True)
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -126,8 +126,8 @@ def run(output_dir=None):
 
     W_bank_raw = scipy.sparse.load_npz(WBANK_PATH)
     W_count_raw = scipy.sparse.load_npz(WCOUNT_PATH)
+    W_bin_full = _build_binary(W_bank_raw)
     W_bank_all = row_standardize(W_bank_raw)
-    W_count_all = row_standardize(W_count_raw)
     W_geo_all, gal_order = load_w_geo(county_order)
     assert gal_order == county_order
 
@@ -166,8 +166,13 @@ def run(output_dir=None):
     for k in K_VALUES:
         print(f"  k={k} ...", flush=True)
         W_knn_all = build_wbank_knn(W_bank_all, k)
-        W_count_knn_all = build_wbank_knn(W_count_all, k)
-        W_binary_knn_all = build_wbank_knn(W_count_all, k, binary=True)
+        # Reuse the cosine-ranked neighbor topology (W_knn_all) and only
+        # reweight those fixed links, matching w_variants._build_reweighted_from_knn.
+        # Independently re-truncating the full count/binary matrix per k is invalid
+        # for binary (tied weights -> arbitrary argpartition selection) and
+        # scale-biased for count (favors high-branch-count counties as neighbors).
+        W_count_knn_all = _build_reweighted_from_knn(W_knn_all, W_count_raw)
+        W_binary_knn_all = _build_reweighted_from_knn(W_knn_all, W_bin_full)
 
         nz  = W_knn_all.nnz - (W_knn_all.diagonal() != 0).sum()
         tot = N_ALL * (N_ALL - 1)
