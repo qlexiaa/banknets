@@ -11,6 +11,10 @@ Variants
   W_bank_binary   : nonzero W_bank entries mapped to 1 (binary connectivity)
   W_bank_knn3     : top-3 nearest bank-network neighbours (from W_bank)
   W_bank_knn4     : top-4 nearest bank-network neighbours (from W_bank)
+  W_bank_count_knn3  : top-3 links ranked by count, count weights retained
+  W_bank_count_knn4  : top-4 links ranked by count, count weights retained
+  W_bank_binary_knn3 : top-3 links ranked by count, binary weights
+  W_bank_binary_knn4 : top-4 links ranked by count, binary weights
   W_bank_nonGeo   : W_bank with geographic-contiguity neighbours zeroed out
   W_bank_interstate : W_bank restricted to cross-state (i,j) pairs only
   W_bank_intrastate : W_bank restricted to within-state (i,j) pairs only
@@ -19,10 +23,7 @@ W_geo (queen contiguity) is returned by load_w_geo() and is used as the
 geographic benchmark throughout.
 
 Cache files live in data/; matrices are built once and reused from .npz files
-on subsequent calls.  Only data/W_bank_binary.npz, data/W_bank_knn3.npz, and
-data/W_bank_knn4.npz are new caches; the others (nonGeo, interstate,
-intrastate) are already built by
-sem_link_restrictions.py and reused here.
+on subsequent calls.
 """
 
 import sys
@@ -49,15 +50,22 @@ PATHS = {
     "W_bank_binary"   : DATA / "W_bank_binary.npz",
     "W_bank_knn3"     : DATA / "W_bank_knn3.npz",
     "W_bank_knn4"     : DATA / "W_bank_knn4.npz",
+    "W_bank_count_knn3"  : DATA / "W_bank_count_knn3.npz",
+    "W_bank_count_knn4"  : DATA / "W_bank_count_knn4.npz",
+    "W_bank_binary_knn3" : DATA / "W_bank_binary_knn3.npz",
+    "W_bank_binary_knn4" : DATA / "W_bank_binary_knn4.npz",
     "W_bank_nonGeo"   : DATA / "W_bank_nonGeo.npz",
     "W_bank_interstate"  : DATA / "W_bank_interstate.npz",
     "W_bank_intrastate"  : DATA / "W_bank_intrastate.npz",
 }
 
-VARIANT_ORDER = [
+ALL_VARIANTS = [
     "W_bank", "W_bank_count", "W_bank_binary", "W_bank_knn3", "W_bank_knn4",
+    "W_bank_count_knn3", "W_bank_count_knn4",
+    "W_bank_binary_knn3", "W_bank_binary_knn4",
     "W_bank_nonGeo", "W_bank_interstate", "W_bank_intrastate",
 ]
+VARIANT_ORDER = ALL_VARIANTS
 
 
 # ── Builder functions ──────────────────────────────────────────────────────────
@@ -86,6 +94,26 @@ def _build_knn(W_bank_sp, k=4):
         else:
             top_k = np.argpartition(row, -k)[-k:]
             W_knn[i, top_k] = row[top_k]
+    np.fill_diagonal(W_knn, 0.0)
+    return scipy.sparse.csr_matrix(W_knn)
+
+
+def _build_knn_from_count(W_count_sp, k, binary=False):
+    """Keep top-k connections ranked by count; weights are count or 1."""
+    W = W_count_sp.toarray().astype(np.float64)
+    np.fill_diagonal(W, 0.0)
+    N = W.shape[0]
+    W_knn = np.zeros_like(W)
+    for i in range(N):
+        row = W[i]
+        nz = np.count_nonzero(row)
+        if nz == 0:
+            continue
+        if nz <= k:
+            keep = np.flatnonzero(row)
+        else:
+            keep = np.argpartition(row, -k)[-k:]
+        W_knn[i, keep] = 1.0 if binary else row[keep]
     np.fill_diagonal(W_knn, 0.0)
     return scipy.sparse.csr_matrix(W_knn)
 
@@ -152,7 +180,7 @@ def load_w_geo(county_order):
 
 
 def load_bank_variants(county_order, W_geo_all=None):
-    """Return OrderedDict[str, csr_matrix] of 7 row-standardised bank-network variants.
+    """Return OrderedDict[str, csr_matrix] of row-standardised bank-network variants.
 
     Parameters
     ----------
@@ -193,21 +221,47 @@ def load_bank_variants(county_order, W_geo_all=None):
     W_knn4_raw = _load_or_build("W_bank_knn4", lambda: _build_knn(W_bank_raw, k=4))
     variants["W_bank_knn4"] = row_standardize(W_knn4_raw)
 
-    # 6. W_bank_nonGeo (geographic neighbours zeroed out)
+    # 6. W_bank_count_knn3/knn4 (top-k by count, count weights retained)
+    W_count_knn3_raw = _load_or_build(
+        "W_bank_count_knn3",
+        lambda: _build_knn_from_count(W_count_raw, k=3, binary=False),
+    )
+    variants["W_bank_count_knn3"] = row_standardize(W_count_knn3_raw)
+
+    W_count_knn4_raw = _load_or_build(
+        "W_bank_count_knn4",
+        lambda: _build_knn_from_count(W_count_raw, k=4, binary=False),
+    )
+    variants["W_bank_count_knn4"] = row_standardize(W_count_knn4_raw)
+
+    # 7. W_bank_binary_knn3/knn4 (top-k by count, binary weights)
+    W_bin_knn3_raw = _load_or_build(
+        "W_bank_binary_knn3",
+        lambda: _build_knn_from_count(W_count_raw, k=3, binary=True),
+    )
+    variants["W_bank_binary_knn3"] = row_standardize(W_bin_knn3_raw)
+
+    W_bin_knn4_raw = _load_or_build(
+        "W_bank_binary_knn4",
+        lambda: _build_knn_from_count(W_count_raw, k=4, binary=True),
+    )
+    variants["W_bank_binary_knn4"] = row_standardize(W_bin_knn4_raw)
+
+    # 8. W_bank_nonGeo (geographic neighbours zeroed out)
     W_ng_raw = _load_or_build(
         "W_bank_nonGeo",
         lambda: _build_nongeo(W_bank_raw, W_geo_all),
     )
     variants["W_bank_nonGeo"] = row_standardize(W_ng_raw)
 
-    # 7. W_bank_interstate (cross-state links only)
+    # 9. W_bank_interstate (cross-state links only)
     W_is_raw = _load_or_build(
         "W_bank_interstate",
         lambda: _build_interstate(W_bank_raw, county_order),
     )
     variants["W_bank_interstate"] = row_standardize(W_is_raw)
 
-    # 8. W_bank_intrastate (within-state links only)
+    # 10. W_bank_intrastate (within-state links only)
     W_ina_raw = _load_or_build(
         "W_bank_intrastate",
         lambda: _build_intrastate(W_bank_raw, county_order),

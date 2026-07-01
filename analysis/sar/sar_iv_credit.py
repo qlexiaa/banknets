@@ -43,7 +43,7 @@ import scipy.stats as st
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import utils  # noqa
 from utils import row_standardize, sparse_to_pysal_w
-from panel_data import CREDIT_CONTROLS, load_panel_with_credit
+from panel_data import CREDIT_CONTROLS, load_panel_with_credit, get_samples
 from w_variants import load_w_geo, load_bank_variants
 
 # esda is used only for Moran's I
@@ -60,6 +60,9 @@ CONLEY_CSV  = ROOT / "output" / "conley_se_comparison.csv"
 DV          = "Dl_nloans_b"
 MORAN_PERMS = 999
 X_VARS      = ["Linter_bra"] + CREDIT_CONTROLS
+SAMPLE_ORDER = ["Full", "Contig"]
+W_ORDER = ["W_geo", "W_bank"]
+SPEC_ORDER = ["KP-2SLS", "SDM-IV"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -139,32 +142,29 @@ def f_test_excluded(z_tilde, X_full, n_excl):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Cluster-robust first-stage F (Wald version)
+# Cluster-robust first-stage F (single-instrument version)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def cluster_robust_f_first_stage(z_f, X_fs, n_excl, state_idx_flat, G):
+def cluster_robust_f_first_stage(z_f, X_fs, param_idx, state_idx_flat, G):
     """
-    Cluster-robust (Wald) F-test for joint significance of the last n_excl
-    columns in X_fs.
+    Cluster-robust scalar first-stage F-test for one instrument coefficient.
 
-    F_cluster = (1/n_excl) * gamma_excl' * V_excl^{-1} * gamma_excl
+    F_cluster = (pi_hat / SE_cluster_pi)^2
 
-    where V_excl is the cluster-robust VCV submatrix for the excluded-
-    instrument coefficients in first-stage OLS.  Uses the same small-sample
-    correction as cluster_se_2sls: G/(G-1) * (NT-1)/(NT-k).
+    Uses the same state-clustered sandwich and small-sample correction as
+    cluster_se_2sls: G/(G-1) * (NT-1)/(NT-k).
 
     Parameters
     ----------
     z_f            : (NT,) endogenous variable (already within-transformed)
-    X_fs           : (NT, k) first-stage design matrix; last n_excl cols
-                     are the excluded instruments
-    n_excl         : number of excluded instruments
+    X_fs           : (NT, k) first-stage design matrix
+    param_idx      : coefficient index for the instrument to test
     state_idx_flat : (NT,) integer state id per observation
     G              : number of state clusters
 
     Returns
     -------
-    (F_cluster, n_excl)
+    (F_cluster, pi_hat, SE_cluster_pi)
     """
     NT = len(z_f)
     k  = X_fs.shape[1]
@@ -181,15 +181,12 @@ def cluster_robust_f_first_stage(z_f, X_fs, n_excl, state_idx_flat, G):
     corr      = (G / (G - 1)) * ((NT - 1) / (NT - k))
     V_cluster = XtX_inv @ B @ XtX_inv * corr
 
-    gamma_excl = delta[-n_excl:]
-    V_excl     = V_cluster[-n_excl:, -n_excl:]
+    idx = param_idx if param_idx >= 0 else k + param_idx
+    pi_hat = float(delta[idx])
+    se_pi = float(np.sqrt(max(V_cluster[idx, idx], 0.0)))
+    F_cluster = float((pi_hat / se_pi) ** 2) if se_pi > 0 else float("nan")
 
-    try:
-        W_stat = float(gamma_excl @ np.linalg.inv(V_excl) @ gamma_excl) / n_excl
-    except np.linalg.LinAlgError:
-        W_stat = float("nan")
-
-    return W_stat, n_excl
+    return F_cluster, pi_hat, se_pi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -457,8 +454,8 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
     F_stat, df1, df2, R2_unr, R2_restr = f_test_excluded(z_f, X_fs, n_excl=2)
 
     # ── Cluster-robust first-stage F ─────────────────────────────────────────
-    F_cluster, _ = cluster_robust_f_first_stage(
-        z_f, X_fs, n_excl=2, state_idx_flat=s["state_idx_flat"], G=G
+    F_cluster, _pi_wd, _pi_wd_se = cluster_robust_f_first_stage(
+        z_f, X_fs, param_idx=-2, state_idx_flat=s["state_idx_flat"], G=G
     )
 
     # ── Instrument collinearity diagnostics (need q3 = W3D) ─────────────────
@@ -475,7 +472,7 @@ def run_iv_sar(s, W_label, sample_label, verbose=True):
     if verbose:
         print(f"  First stage: alpha_WD={delta_fs[-2]:.4f}  "
               f"alpha_W2D={delta_fs[-1]:.4f}  "
-              f"R2={R2_unr:.4f}  F(2,{df2})={F_stat:.2f}  F_cl={F_cluster:.2f}")
+              f"R2={R2_unr:.4f}  F(2,{df2})={F_stat:.2f}  F_cl(WD)={F_cluster:.2f}")
         print(f"  corr(WD,W2D)={corr_q1q2:.4f}  corr(W2D,W3D)={corr_q2q3:.4f}  "
               f"cond={cond_num_instr:.1f}")
         if F_stat < 10:
@@ -639,9 +636,9 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
     delta_fs, z_hat_f, resid_fs, _ = ols_fit(X_fs, z_f)
     F_stat, df1, df2, R2_unr, R2_restr = f_test_excluded(z_f, X_fs, n_excl=2)
 
-    # Cluster-robust first-stage F
-    F_cluster, _ = cluster_robust_f_first_stage(
-        z_f, X_fs, n_excl=2, state_idx_flat=s["state_idx_flat"], G=G
+    # Cluster-robust first-stage F for the first excluded instrument (W2D)
+    F_cluster, _pi_w2d, _pi_w2d_se = cluster_robust_f_first_stage(
+        z_f, X_fs, param_idx=-2, state_idx_flat=s["state_idx_flat"], G=G
     )
 
     # Instrument collinearity diagnostics
@@ -652,7 +649,7 @@ def run_sdm_iv(s, W_label, sample_label, verbose=True):
     if verbose:
         print(f"  SDM first stage: alpha_WD={delta_fs[-3]:.4f}  "
               f"alpha_W2D={delta_fs[-2]:.4f}  alpha_W3D={delta_fs[-1]:.4f}  "
-              f"R2={R2_unr:.4f}  F(2,{df2})={F_stat:.2f}  F_cl={F_cluster:.2f}")
+              f"R2={R2_unr:.4f}  F(2,{df2})={F_stat:.2f}  F_cl(W2D)={F_cluster:.2f}")
         print(f"  corr(WD,W2D)={corr_q1q2:.4f}  corr(W2D,W3D)={corr_q2q3:.4f}  "
               f"cond={cond_num_instr:.1f}")
         if F_stat < 10:
@@ -1050,12 +1047,12 @@ def run(output_dir=None):
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
     YEARS    = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
-    panel_border = panel[panel["border"] == 1].copy()
 
-    # IV-SAR runs for Full and Contig samples only
-    # (NonContig excluded: border-discontinuity IV requires the contig sample;
-    #  NonContig instruments are severely weak under dense W_bank)
-    samples = [("Full", panel), ("Contig", panel_border)]
+    sample_lookup = dict(get_samples(panel))
+    missing_samples = [sample for sample in SAMPLE_ORDER if sample not in sample_lookup]
+    if missing_samples:
+        raise KeyError(f"get_samples() did not return: {missing_samples}")
+    samples = [(sample, sample_lookup[sample]) for sample in SAMPLE_ORDER]
 
     # ── Load existing results for comparison table ────────────────────────────
     sar_df = pd.read_csv(SAR_CSV) if SAR_CSV.exists() else pd.DataFrame()
@@ -1077,7 +1074,7 @@ def run(output_dir=None):
 
         all_iv_results[sample_label] = {}
 
-        for W_label in ["W_geo", "W_bank"]:
+        for W_label in W_ORDER:
             # ── KP-2SLS ─────────────────────────────────────────────────────
             r = run_iv_sar(s, W_label, sample_label, verbose=True)
             all_iv_results[sample_label][(sample_label, W_label)] = r
@@ -1150,8 +1147,26 @@ def run(output_dir=None):
                 "first_stage_F", "first_stage_F_cluster",
                 "corr_q1q2", "corr_q2q3", "cond_num_instr",
                 "residual_moran_i_mean", "N_counties", "N_obs"]
-        pd.DataFrame(csv_rows)[cols].to_csv(
-            output_dir / "sar_iv_results.csv", index=False)
+        df_out = pd.DataFrame(csv_rows, columns=cols)
+        expected_rows = {
+            (sample, W_label, spec)
+            for sample in SAMPLE_ORDER
+            for W_label in W_ORDER
+            for spec in SPEC_ORDER
+        }
+        observed_rows = set(zip(df_out["sample"], df_out["W"], df_out["spec"]))
+        if len(df_out) != len(expected_rows) or observed_rows != expected_rows:
+            raise RuntimeError(
+                f"Expected {len(expected_rows)} SAR-IV rows; got {len(df_out)}. "
+                f"Missing={sorted(expected_rows - observed_rows)}, "
+                f"extra={sorted(observed_rows - expected_rows)}"
+            )
+        if df_out["first_stage_F_cluster"].isna().any():
+            bad = df_out.loc[
+                df_out["first_stage_F_cluster"].isna(), ["sample", "W", "spec"]
+            ].to_dict("records")
+            raise RuntimeError(f"Missing first_stage_F_cluster for: {bad}")
+        df_out.to_csv(output_dir / "sar_iv_results.csv", index=False)
         print(f"\nSaved sar_iv_results.csv to {output_dir}")
 
     # ── Comparison plot ────────────────────────────────────────────────────────

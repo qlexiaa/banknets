@@ -57,6 +57,9 @@ X_VARS      = ["Linter_bra"] + CREDIT_CONTROLS
 PLACEBO_X_VARS = ["Linter_bra"] + PLACEBO_CONTROLS
 PERM_SEED   = 42
 N_PERM      = 999
+EXPECTED_SAMPLES = ["Full", "Contig", "NonContig"]
+EXPECTED_ROWS_PER_SAMPLE = 5
+ZERO_VAR_TOL = 1e-12
 
 
 # ==============================================================================
@@ -325,6 +328,35 @@ def _estimate_sample(samp, sample_label):
 
     # -- (2) SLX: y ~ D + E ---------------------------------------------------
     E_w    = _within(E_TN).ravel()
+    if float(np.nanvar(E_w)) <= ZERO_VAR_TOL:
+        note = "E zero variance"
+        rows.append(_make_row(
+            sample_label, f"SLX-OLS ({note})", DV,
+            beta_b, se_b_ols, None, None, NT, N,
+        ))
+        rows.append(_make_row(
+            sample_label, f"SLX-Conley ({note})", DV,
+            beta_b, se_b_ols, None, None, NT, N,
+        ))
+        rows.append(_make_row(
+            sample_label, f"SLX-Cluster ({note})", DV,
+            beta_b, se_b_ols, None, None, NT, N,
+        ))
+
+        yp_w    = _within(yp_TN).ravel()
+        C_pl_w  = _within_3d(placebo_controls_TNK).reshape(NT, len(PLACEBO_CONTROLS))
+        X_pl    = np.column_stack([D_w, C_pl_w])
+        beta_pl, u_pl, XtX_pl = _ols(yp_w, X_pl)
+        se_pl = _se_ols(XtX_pl, u_pl, NT, 1 + len(PLACEBO_CONTROLS))
+        rows.append(_make_row(
+            sample_label, f"Placebo-OLS ({note})", DV_PLACEBO,
+            beta_pl, se_pl, None, None, NT, N,
+        ))
+
+        beta_s = np.r_[beta_b, np.nan]
+        se_s_ols = np.r_[se_b_ols, np.nan]
+        return rows, beta_s, se_s_ols, se_s_ols, se_s_ols, beta_pl, se_pl, np.nan
+
     X_slx  = np.column_stack([D_w, C_w, E_w])
     beta_s, u_s, XtX_s = _ols(y_w, X_slx)
 
@@ -460,8 +492,11 @@ def run(output_dir=None):
                        if not np.isnan(row['p_perm']) else f"{'':>7}"
                 print(f"{row['spec']:<18} {row['dv']:<18} {bd} {se_d}  {be} {se_e}  {pp}")
             print()
-            print(f"Permutation test: |beta_E_perm| >= |{beta_s[-1]:.4f}| "
-                  f"in {round(p_perm * N_PERM)}/{N_PERM} reps  ->  p_perm = {p_perm:.4f}")
+            if np.isnan(p_perm):
+                print("Permutation test skipped: exposure has zero within-sample variance.")
+            else:
+                print(f"Permutation test: |beta_E_perm| >= |{beta_s[-1]:.4f}| "
+                      f"in {round(p_perm * N_PERM)}/{N_PERM} reps  ->  p_perm = {p_perm:.4f}")
             print("Significance: *** p<0.01  ** p<0.05  * p<0.10")
 
         except Exception as exc:
@@ -473,6 +508,14 @@ def run(output_dir=None):
                 "beta_D", "se_D", "t_D", "p_D",
                 "beta_E", "se_E", "t_E", "p_E", "p_perm"]
         df_out = pd.DataFrame(all_rows)[cols]
+        expected_rows = len(EXPECTED_SAMPLES) * EXPECTED_ROWS_PER_SAMPLE
+        sample_counts = df_out.groupby("sample").size().to_dict()
+        missing_samples = [s for s in EXPECTED_SAMPLES if sample_counts.get(s) != EXPECTED_ROWS_PER_SAMPLE]
+        if len(df_out) != expected_rows or missing_samples:
+            raise RuntimeError(
+                f"Expected {expected_rows} SLX rows ({EXPECTED_ROWS_PER_SAMPLE} per sample); "
+                f"got {len(df_out)} rows with counts {sample_counts}"
+            )
         out_path = output_dir / "slx_exposure_results.csv"
         df_out.to_csv(out_path, index=False)
         print(f"\nSaved slx_exposure_results.csv to {output_dir}")

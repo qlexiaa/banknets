@@ -31,6 +31,7 @@ from w_variants import load_w_geo
 ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 WBANK_PATH  = ROOT / "data" / "W_bank_avg.npz"
+WCOUNT_PATH = ROOT / "data" / "W_bank_count_avg.npz"
 
 K_VALUES = list(range(1, 21))
 
@@ -38,7 +39,11 @@ DV = "Dl_nloans_b"
 X_VARS = ["Linter_bra"] + CREDIT_CONTROLS
 
 
-def build_wbank_knn(W_sparse, k):
+def empty_estimate():
+    return dict(lam=np.nan, se_lam=np.nan, n_co=np.nan, n_obs=np.nan)
+
+
+def build_wbank_knn(W_sparse, k, binary=False):
     """Keep top-k weights per row, re-standardise. Returns scipy CSR."""
     W = W_sparse.toarray().astype(np.float64)
     np.fill_diagonal(W, 0.0)
@@ -50,10 +55,10 @@ def build_wbank_knn(W_sparse, k):
         if nz == 0:
             continue
         if nz <= k:
-            W_knn[i] = row
+            keep = np.flatnonzero(row)
         else:
-            top_k = np.argpartition(row, -k)[-k:]
-            W_knn[i, top_k] = row[top_k]
+            keep = np.argpartition(row, -k)[-k:]
+        W_knn[i, keep] = 1.0 if binary else row[keep]
     np.fill_diagonal(W_knn, 0.0)
     rs = W_knn.sum(axis=1, keepdims=True)
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -120,7 +125,9 @@ def run(output_dir=None):
     N_ALL        = len(county_order)
 
     W_bank_raw = scipy.sparse.load_npz(WBANK_PATH)
+    W_count_raw = scipy.sparse.load_npz(WCOUNT_PATH)
     W_bank_all = row_standardize(W_bank_raw)
+    W_count_all = row_standardize(W_count_raw)
     W_geo_all, gal_order = load_w_geo(county_order)
     assert gal_order == county_order
 
@@ -159,6 +166,8 @@ def run(output_dir=None):
     for k in K_VALUES:
         print(f"  k={k} ...", flush=True)
         W_knn_all = build_wbank_knn(W_bank_all, k)
+        W_count_knn_all = build_wbank_knn(W_count_all, k)
+        W_binary_knn_all = build_wbank_knn(W_count_all, k, binary=True)
 
         nz  = W_knn_all.nnz - (W_knn_all.diagonal() != 0).sum()
         tot = N_ALL * (N_ALL - 1)
@@ -166,21 +175,38 @@ def run(output_dir=None):
         sparsity = 1.0 - density
         avg_nbrs = nz / N_ALL
 
-        knn = {}
+        variant_specs = [
+            ("continuous", W_knn_all, f"W_bank_k{k}"),
+            ("count", W_count_knn_all, f"W_bank_count_k{k}"),
+            ("binary", W_binary_knn_all, f"W_bank_binary_k{k}"),
+        ]
+        estimates = {variant: {} for variant, _, _ in variant_specs}
         geo = {}
         for sample_label, panel_sub, *_ in samples:
-            y, x, w_knn, N, usable = build_arrays(
-                panel_sub, county_order, W_knn_all, YEARS, year_pos, sample_label)
-            res = run_fe(y, x, w_knn, f"W_bank_k{k}", sample_label, YEARS)
-            knn[sample_label] = dict(lam=float(res.lam), n_co=N, n_obs=N * T)
-            geo[sample_label] = paired_geo_ref(sample_label, panel_sub, usable)
+            usable_ref = None
+            for variant, W_variant_all, w_label in variant_specs:
+                try:
+                    y, x, w_knn, N, usable = build_arrays(
+                        panel_sub, county_order, W_variant_all, YEARS, year_pos, sample_label)
+                    res = run_fe(y, x, w_knn, w_label, sample_label, YEARS)
+                    estimates[variant][sample_label] = dict(lam=float(res.lam), n_co=N, n_obs=N * T)
+                    usable_ref = usable_ref or usable
+                    geo.setdefault(sample_label, paired_geo_ref(sample_label, panel_sub, usable))
+                except Exception as exc:
+                    print(f"    [WARN] k={k} {sample_label} {variant} failed: {exc}", flush=True)
+                    estimates[variant][sample_label] = empty_estimate()
+            if sample_label not in geo:
+                geo[sample_label] = empty_estimate()
 
         geo_f = geo["Full"]
         geo_b = geo["Contig"]
         geo_nb = geo["NonContig"]
-        lam_f = knn["Full"]["lam"]
-        lam_b = knn["Contig"]["lam"]
-        lam_nb = knn["NonContig"]["lam"]
+        cont = estimates["continuous"]
+        cnt = estimates["count"]
+        bin_ = estimates["binary"]
+        lam_f = cont["Full"]["lam"]
+        lam_b = cont["Contig"]["lam"]
+        lam_nb = cont["NonContig"]["lam"]
 
         sweep_rows.append(dict(
             k                      = k,
@@ -193,20 +219,32 @@ def run(output_dir=None):
             se_lam_geo             = geo_f["se_lam"],
             lam_bank_knn           = lam_f,
             gap                    = lam_f - geo_f["lam"],
-            n_co                   = knn["Full"]["n_co"],
-            n_obs                  = knn["Full"]["n_obs"],
+            lam_bank_count_knn     = cnt["Full"]["lam"],
+            gap_count              = cnt["Full"]["lam"] - geo_f["lam"],
+            lam_bank_binary_knn    = bin_["Full"]["lam"],
+            gap_binary             = bin_["Full"]["lam"] - geo_f["lam"],
+            n_co                   = cont["Full"]["n_co"],
+            n_obs                  = cont["Full"]["n_obs"],
             lam_geo_contig         = geo_b["lam"],
             se_lam_geo_contig      = geo_b["se_lam"],
             lam_bank_knn_contig    = lam_b,
             gap_contig             = lam_b - geo_b["lam"],
-            n_co_contig            = knn["Contig"]["n_co"],
-            n_obs_contig           = knn["Contig"]["n_obs"],
+            lam_bank_count_knn_contig = cnt["Contig"]["lam"],
+            gap_count_contig          = cnt["Contig"]["lam"] - geo_b["lam"],
+            lam_bank_binary_knn_contig = bin_["Contig"]["lam"],
+            gap_binary_contig          = bin_["Contig"]["lam"] - geo_b["lam"],
+            n_co_contig            = cont["Contig"]["n_co"],
+            n_obs_contig           = cont["Contig"]["n_obs"],
             lam_geo_noncontig      = geo_nb["lam"],
             se_lam_geo_noncontig   = geo_nb["se_lam"],
             lam_bank_knn_noncontig = lam_nb,
             gap_noncontig          = lam_nb - geo_nb["lam"],
-            n_co_noncontig         = knn["NonContig"]["n_co"],
-            n_obs_noncontig        = knn["NonContig"]["n_obs"],
+            lam_bank_count_knn_noncontig = cnt["NonContig"]["lam"],
+            gap_count_noncontig          = cnt["NonContig"]["lam"] - geo_nb["lam"],
+            lam_bank_binary_knn_noncontig = bin_["NonContig"]["lam"],
+            gap_binary_noncontig          = bin_["NonContig"]["lam"] - geo_nb["lam"],
+            n_co_noncontig         = cont["NonContig"]["n_co"],
+            n_obs_noncontig        = cont["NonContig"]["n_obs"],
         ))
 
     df_sweep = pd.DataFrame(sweep_rows)
@@ -248,16 +286,32 @@ def run(output_dir=None):
 
     if output_dir is not None:
         cols = ["k","n_links","possible_links","density","sparsity","avg_nbrs",
-                "lam_geo","se_lam_geo","lam_bank_knn","gap","n_co","n_obs",
+                "lam_geo","se_lam_geo","lam_bank_knn","gap",
+                "lam_bank_count_knn","gap_count",
+                "lam_bank_binary_knn","gap_binary",
+                "n_co","n_obs",
                 "lam_geo_contig","se_lam_geo_contig","lam_bank_knn_contig",
-                "gap_contig","n_co_contig","n_obs_contig",
+                "gap_contig","lam_bank_count_knn_contig","gap_count_contig",
+                "lam_bank_binary_knn_contig","gap_binary_contig",
+                "n_co_contig","n_obs_contig",
                 "lam_geo_noncontig","se_lam_geo_noncontig",
                 "lam_bank_knn_noncontig","gap_noncontig",
+                "lam_bank_count_knn_noncontig","gap_count_noncontig",
+                "lam_bank_binary_knn_noncontig","gap_binary_noncontig",
                 "n_co_noncontig","n_obs_noncontig"]
-        df_sweep[cols].to_csv(output_dir / "knn_sweep_credit_results.csv", index=False)
+        # k=11 excluded if the contiguous sample has <11 average bank neighbours,
+        # making knn11 degenerate; the same rule handles any later singular KNN fit.
+        df_save = df_sweep.dropna(subset=["lam_bank_knn_contig", "gap_contig"]).copy()
+        dropped = sorted(set(df_sweep["k"]) - set(df_save["k"]))
+        if dropped:
+            print(f"  Dropping KNN rows with missing Contig estimates: k={dropped}")
+        if df_save[cols].isna().any().any():
+            missing = df_save.loc[df_save[cols].isna().any(axis=1), ["k"]]
+            raise RuntimeError(f"KNN sweep still contains empty cells:\n{missing}")
+        df_save[cols].to_csv(output_dir / "knn_sweep_credit_results.csv", index=False)
         print(f"\nSaved knn_sweep_credit_results.csv to {output_dir}")
 
-    return df_sweep
+    return df_save if output_dir is not None else df_sweep
 
 
 if __name__ == '__main__':

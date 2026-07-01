@@ -1,0 +1,1402 @@
+% ======================= 5. RESULTS =======================
+\section{Results}\label{sec:results}
+
+\subsection{The credit-supply shock and the role of bank branches}
+\label{sec:fi-results}
+
+The analysis starts by re-establishing the \cite{favara2015} credit-supply
+result on the present panel, because it is precisely this result that motivates a
+bank-network view of spatial transmission. Table~\ref{tab:placebo} reports the estimates of the
+benchmark regression \eqref{eq:baseline} for commercial banks and for the placebo
+group of lenders that interstate branching deregulation did not cover. 
+
+\begin{table}[htbp]
+  \centering
+  \caption{Commercial-bank credit growth and the placebo lenders.}
+  \label{tab:placebo}
+  \begin{tabular}{lcc}
+    \toprule
+     & Panel A: Commercial banks & Panel B: Placebo lenders \\
+    \midrule
+    Deregulation $D_{s,t-1}$ & $0.028^{**}$ & $0.002$ \\
+                             & $(0.011)$ & $(0.009)$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Dependent variable is log mortgage-originations growth. Standard errors clustered by state in parentheses. Panel A: 10,992 obs, 1,018 counties; Panel B: 10,580 obs, 1,017 counties.
+  \end{tablenotes}
+\end{table}
+
+Commercial-bank originations grow significantly faster in states that remove a
+branching restriction ($\hat\beta_1 = 0.028$, clustered $\mathrm{SE}=0.010$),
+while the placebo coefficient is statistically indistinguishable from zero. The
+differential response shows that the estimate
+reflects a supply-side shock rather than a contemporaneous credit-demand boom, as a
+demand boom would have lifted placebo lending as well. The point estimate matches
+the original study, so the panel reproduces the benchmark effect that the rest of
+the thesis builds on. One point carries forward to the spatial models.
+The benchmark in Table~\ref{tab:placebo} is estimated on the full Favara--Imbs
+sample of $1{,}018$ counties ($10{,}992$ county-years). The spatial estimators
+that follow additionally require a balanced panel, a non-empty bank-network
+neighbour set, and a common county support across $W_{\text{bank}}$ and
+$W_{\text{geo}}$. This reduces the full spatial sample to $877$ counties
+($9{,}647$ county-years). On this subsample the deregulation coefficient is
+$\hat\beta_1 \approx 0.026$, with the same standard error, so the small difference
+from Table~\ref{tab:placebo} is a sample-composition effect, not a change in the
+underlying result.
+
+The mechanism behind that effect is what makes a bank-network weights matrix the object of study of this paper. Table~\ref{tab:banktype} reports the splits of commercial banks by the
+location of their branches, following \cite{favara2015}: out-of-state banks
+that operate a local branch in the county, out-of-state banks without a local
+branch, and in-state banks.
+
+\begin{table}[htbp]
+  \centering
+  \caption{The importance of bank location and of bank branches (contiguous-county sample).}
+  \label{tab:banktype}
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+     & OOS, local branch & OOS, no branch & In-state \\
+    \midrule
+    \# mortgages originated & $0.162^{**}$ & $0.013$ & $0.030^{*}$ \\
+                            & $(0.082)$ & $(0.009)$\,[0.059] & $(0.018)$\,[0.108] \\
+    \addlinespace
+    \# local branches & $0.103^{***}$ & --- & $-0.008$ \\
+                            & $(0.039)$ & --- & $(0.010)$\,[0.013] \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Bracketed values are p-values for equality with the out-of-state local-branch coefficient where available.
+  \end{tablenotes}
+\end{table}
+
+
+The pattern is the exact same one discussed by \cite{favara2015}. Among out-of-state banks that hold a
+local branch in the county, deregulation raises originations by $0.162$ (clustered
+$\mathrm{SE}=0.082$) and it raises the number of
+local branches they operate by $0.103$ ($\mathrm{SE}=0.039$).
+Out-of-state banks without a local branch show essentially no response in the number of originations ($0.013$),
+and in-state banks at most a marginal one ($0.030$). In the full sample (Appendix
+Table~\ref{tab:banktype-full}) the distinction is sharper still: the no-branch and
+in-state coefficients are near zero ($0.016$ and $0.003$) and statistically
+different from the local-branch panel ($p=0.016$ and $p=0.013$). The bracketed values test whether each panel's coefficient differs from the
+local-branch panel's. The test rejects cleanly in the full sample but only
+marginally in the contiguous one ($p=0.108$ for in-state originations).
+
+The economic reading is direct: the credit-supply shock propagates through the
+physical branch networks of multi-market banks, the same banks that, after the
+IBBEA, actively expand that branch presence across state lines. This is the
+empirical foundation for the central design choice of this study. If transmission runs through which banks operate where, then a weights
+matrix encoding shared bank-holding-company presence across counties should describe the dependence structure of credit
+growth more accurately than geography.
+
+\subsection{Residual spatial structure}
+\label{sec:diag-results}
+Under
+queen contiguity, Moran's $I$ is positive and significant in every year (mean
+$0.17$, all eleven years significant at the $5\%$ permutation level). Once
+deregulation, controls, and fixed effects are removed, what is left is not
+independent county noise: connected counties still have similar unexplained
+credit growth.
+
+Geography is only one reason counties might move together, and the results in
+Section~\ref{sec:fi-results} points to another. Credit moves through banks, and
+many banks lend in several counties at once. A bank that operates in two counties
+can shift funds between them, so a shock in one of its markets can surface in the
+other even when the two counties are far apart or in different states. After the
+IBBEA, these banks expanded across state lines, so the counties a single bank ties
+together increasingly straddle borders. This is the reason for building
+$W_{\text{bank}}$: it connects two counties when the same banks operate in both,
+whatever the distance between them. If credit really travels through bank ownership, this map should explain the leftover co-movement better than physical
+adjacency.
+
+A raw Moran's $I$ comparison hides this because the two maps do not have the same density. When the spatial lag is averaged over hundreds of different counties, the
+statistic is pulled toward zero. The cross-state bank matrix makes a similar: it is
+also dense ($\approx 38\%$), yet its Moran's $I$ stays positive and significant in
+$7$ of $11$ years; therefore, counties in different states, served by the same banks, do seem to
+move together.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Residual spatial dependence and matrix density (full sample).}
+  \label{tab:moran-summary}
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+    Weights matrix & Mean Moran's $I$ & Density (\%) & Mean neighbours \\
+    \midrule
+    $W_{\text{geo}}$ & $0.17$ & $0.3$ & $3.4$ \\
+    $W_{\text{bank,knn3}}$ & $0.15$ & $0.3$ & $2.9$ \\
+    $W_{\text{bank,intra}}$ & $0.11$ & $2.6$ & $27.0$ \\
+    $W_{\text{bank,inter}}$ & $0.01$ & $37.6$ & $384.6$ \\
+    $W_{\text{bank}}$ & $0.05$ & $40.3$ & $411.6$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Mean over 1995--2005 of year-by-year Moran's $I$ on within-OLS residuals.
+  \end{tablenotes}
+\end{table}
+
+Table~\ref{tab:moran-summary} shows this directly: as the matrices get denser their
+raw Moran's $I$ falls, so the statistic cannot be used to rank them. Fair comparisons can be made in two ways. First, the bank network can be restricted to roughly the same size as the geographic network. This is what the KNN-3 version does: each county has about the same number of neighbours as under queen contiguity, and its Moran’s $I$ is $0.15$, close to the geographic benchmark. Second, one can compare the maximum-likelihood spatial parameter, which will be done in the following sections. Unlike Moran’s $I$, this parameter is not affected by network density in the same direct way. 
+
+Two further checks support taking the bank map seriously: only about a
+third of each county's five strongest bank links are also queen neighbours, so it is not
+geography under another name; and the LM tests reject independence and favour the
+error model under geography and the density-matched bank matrices. The spatial error model is therefore the main specification, with the SAR kept as a parallel
+check.
+
+\subsection{Spatial error dependence is stronger through the bank network}
+\label{sec:sem-results}
+
+Table~\ref{tab:sem-main} reports the spatial error model for all three samples,
+comparing geography, the bank network, and the density-matched KNN-3 truncation.
+The full matrix set is in Appendix Table~\ref{tab:sem-full}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Spatial error model: deregulation effect and spatial parameter, all samples.}
+  \label{tab:sem-main}
+  \begin{tabular}{llccc}
+    \toprule
+    Sample & Weights matrix & $\hat\beta_1$ & $\hat\lambda$ & Gap vs.\ $W_{\text{geo}}$ \\
+    \midrule
+    Full & $W_{\text{geo}}$ & $0.026^{***}\,(0.005)$ & $0.186^{***}\,(0.011)$ & -- \\
+    Full & $W_{\text{bank,knn3}}$ & $0.026^{***}\,(0.005)$ & $0.228^{***}\,(0.012)$ & $0.042\ (z{=}2.59)^{***}$ \\
+    Full & $W_{\text{bank}}$ & $0.018^{***}\,(0.005)$ & $0.634^{***}\,(0.037)$ & $0.449\ (z{=}11.66)^{***}$ \\
+    \addlinespace
+    Contig & $W_{\text{geo}}$ & $0.037^{***}\,(0.007)$ & $0.113^{***}\,(0.022)$ & -- \\
+    Contig & $W_{\text{bank,knn3}}$ & $0.040^{***}\,(0.007)$ & $0.158^{***}\,(0.021)$ & $0.044\ (z{=}1.44)^{*}$ \\
+    Contig & $W_{\text{bank}}$ & $0.028^{***}\,(0.007)$ & $0.353^{***}\,(0.052)$ & $0.239\ (z{=}4.26)^{***}$ \\
+    \addlinespace
+    Non-contig & $W_{\text{geo}}$ & $0.024^{***}\,(0.006)$ & $0.201^{***}\,(0.012)$ & -- \\
+    Non-contig & $W_{\text{bank,knn3}}$ & $0.022^{***}\,(0.006)$ & $0.236^{***}\,(0.013)$ & $0.034\ (z{=}1.93)^{**}$ \\
+    Non-contig & $W_{\text{bank}}$ & $0.018^{***}\,(0.006)$ & $0.613^{***}\,(0.040)$ & $0.412\ (z{=}9.82)^{***}$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Gap statistics compare each bank matrix with a same-sample geographic baseline.
+  \end{tablenotes}
+\end{table}
+
+The table gives three results, and they hold in every sample. 
+First, the deregulation effect survives. $\hat\beta_1$ stays positive and significant under every matrix, close to the benchmark of
+Section~\ref{sec:fi-results}. Modelling the errors does not change the result of \cite{favara2015}. 
+Second, the bank network picks up more residual co-movement than geography does. In the full sample $\hat\lambda$ rises from $0.188$ to $0.634$ ($z=11.6$). The contiguous and non-contiguous samples show the same ordering.
+Third, most of that gap is density, not economics, and so is a second,
+opposite-looking effect that we do not hide. The full bank matrix links each county to about $40\%$ of the country. A filter that dense treats almost everything as shared movement and subtracts it out. Two things happen. $\hat\lambda$ is pushed up and $\hat\beta_1$ is pushed down, from $0.026$ to
+$0.018$ in the full sample, because part of the deregulation signal looks like shared movement and
+gets subtracted along with the noise. Neither shift is real: the bank channel is not that much stronger than geography, and the treatment effect is not weaker.
+
+For this reason, this study treats the sparse KNN bank matrices as the density-matched comparison,
+with KNN-3 and KNN-4 bracketing the average degree of queen contiguity. The full-sample
+bank advantage is robust across both truncations, while in the contiguous sample the
+advantage is positive but sensitive to the exact truncation. The stronger border-sample
+evidence comes from the cross-state bank-link restriction rather than from the generic
+KNN truncation alone. The density-matched evidence is therefore strongest in the full and non-contiguous
+samples. In the contiguous sample the KNN bank coefficients remain positive but are
+not robustly above geography across neighbouring truncations. There, the clearer
+evidence comes from the cross-state bank-link matrix, which exceeds geography while
+the within-state restriction does not.
+
+Dropping every bank link that is also a geographic neighbour still leaves
+$\hat\lambda=0.520$ in the full sample, so the bank map is not geography in
+disguise. Moreover, in the full sample both
+cross-state ($0.315$) and within-state ($0.349$) links beat geography. In the
+contiguous sample, where counties across a border share one
+economy, only cross-state links beat geography ($0.269$, $z=2.53$); within-state
+links do not ($0.147$, $z=0.95$). Where identification is strongest, the signal sits on the cross-state bank links, the channel the IBBEA opened and that
+Table~\ref{tab:banktype} isolates.
+
+\subsection{Robustness of the ranking}
+\label{sec:robust-results}
+
+The ranking survives a range of other estimators. Table~\ref{tab:robust-snap} gives
+the full-sample snapshot; the same pattern holds in the contiguous and
+non-contiguous samples, and the complete estimator-by-sample tables are in Appendix~\ref{app:results}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Robustness of the ranking across estimators (full sample).}
+  \label{tab:robust-snap}
+  \small
+  \begin{tabular}{lc}
+    \toprule
+    Estimator & Estimate \\
+    \midrule
+    SAR $\hat\rho$, $W_{\text{geo}}$ & $0.177^{***}\,(0.011)$ \\
+    SAR $\hat\beta_1$, $W_{\text{geo}}$ & $0.022^{***}\,(0.004)$ \\
+    SAR $\hat\rho$, $W_{\text{bank,knn3}}$ & $0.219^{***}\,(0.012)$ \\
+    SAR $\hat\beta_1$, $W_{\text{bank,knn3}}$ & $0.021^{***}\,(0.004)$ \\
+    SAR $\hat\rho$, $W_{\text{bank}}$ & $0.646^{***}\,(0.036)$ \\
+    SAR $\hat\beta_1$, $W_{\text{bank}}$ & $0.020^{***}\,(0.004)$ \\
+    \addlinespace
+    OLS (Favara-Imbs) & $0.021^{**}\,(0.010)$ \\
+    FGLS W\_geo & $0.021^{*}\,(0.012)$ \\
+    FGLS W\_bank\_knn3 & $0.020\,(0.013)$ \\
+    FGLS W\_bank & $0.015\,(0.012)$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} SAR entries use ML spatial-lag estimates; FGLS entries use state-clustered standard errors.
+  \end{tablenotes}
+\end{table}
+
+\paragraph{Spatial autoregressive model.} The SAR puts the dependence in the
+outcome instead of the error, and tells the same story. The spatial-lag parameter
+runs $0.178$ (geography), $0.219$ (KNN-3), $0.646$ (full bank), the same
+ordering as the SEM, and the same large jump from KNN-3 to the dense matrix. The
+deregulation coefficient barely moves. The
+contiguous and non-contiguous samples repeat this.
+
+\paragraph{Feasible GLS.} This check asks which map removes variation that matters
+for the coefficient. Filtering out the geographic or KNN-3 error structure leaves
+$\hat\beta_1$ where it was and keeps it significant ($0.026$, $p=0.04$ and $0.05$).
+Filtering out the full bank-network structure shrinks it by about a third (from $0.025$ to $0.018$) and the significance is gone ($p=0.15$). This is the
+same effect as before: the dense bank filter soaks up part of the deregulation
+signal, the sparse filters do not, which is why KNN-3 is the fair comparison. One
+sample stands out: in the contiguous sample the coefficient survives even the full
+bank filter ($0.028$, $p=0.02$), so the effect is most robust exactly where identification is cleanest.
+
+\paragraph{J-test and look-ahead.} The Davidson--MacKinnon $J$-test points the same
+way. Adding the bank network's prediction to the geographic error model is highly
+significant ($z=11.7$, full sample), so the bank map carries spatial information
+geography misses. However, the reverse also rejects, so the two maps are complementary, not
+nested. A look-ahead worry remains, because the time-averaged bank network uses
+branch data from later years. Rebuilding it from the 1994 cross-section alone, before
+the post-IBBEA expansion, still puts $\hat\lambda$ at $0.391$, well above
+geography's $0.188$ (gap $z=6.4$); the 1994 and time-averaged networks are highly
+correlated ($r\approx0.85$). The level is lower only because the 1994 network is sparser, so the ranking is unchanged and the look-ahead is not driving the result.
+
+The instrumental-variables and spatial-Durbin versions of the SAR are kept only as a
+diagnostic in Appendix~\ref{app:ivsar}: their instruments are weak or invalid. The
+spatial lag of deregulation has its own direct effect on credit growth, as it will be discussed in the next session, which is why maximum likelihood is the retained estimator.
+
+\subsection{How far, and through whom, shocks travel}
+\label{sec:reach-results}
+
+Beyond whether the bank network matters, the error multiplier asks how far an
+unexplained credit shock propagates. Table~\ref{tab:reach} reports the spatial
+multiplier decomposition of Section~\ref{sec:semsar}, again with geography set
+against the density-matched truncations and the full bank network.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Spatial error multiplier: indirect share and geographic reach, full sample.}
+  \label{tab:reach}
+  \begin{tabular}{lcccc}
+    \toprule
+    Weights matrix & $\hat\lambda$ & Total mult. & Indirect share (\%) & Avg. reach (km) \\
+    \midrule
+    $W_{\text{geo}}$ & $0.186$ & $1.23$ & $17.5$ & $44$ \\
+    $W_{\text{bank,knn3}}$ & $0.228$ & $1.29$ & $21.8$ & $118$ \\
+    $W_{\text{bank,knn4}}$ & $0.264$ & $1.36$ & $25.4$ & $135$ \\
+    $W_{\text{bank}}$ & $0.634$ & $2.74$ & $63.3$ & $1068$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Reach is the transmission-weighted average great-circle distance.
+  \end{tablenotes}
+\end{table}
+
+The contrast is striking and also the one that most needs
+the density caveat.Under geography, a residual shock travels on average about $45$ km. Under the sparse
+bank truncations, the reach rises to roughly $117--134$ km, about $2.5--3$ times the
+geographic reach. Under the full bank network it rises to about $1,050$ km, but that
+headline number should be read through the density caveat. The hub analysis (Appendix Table~\ref{tab:hubs}) gives this a concrete
+geography. Under the full bank network,
+the largest receiver counties are concentrated in the South and Sun Belt, including
+Florida, Tennessee, Arizona, and Georgia, with Idaho also appearing among the top
+receivers. Under density-matched KNN networks, the leading receivers shift toward
+Texas, the Carolinas, Minnesota, Louisiana, Ohio, and Georgia. The hub results should
+therefore be read descriptively: they identify where the fitted network concentrates
+transmission, but they are not the main source of identification.
+
+\subsection{Reduced-form confirmation: cross-state exposure}
+\label{sec:slx-results}
+
+The spatial models infer the network from residual co-movement. The SLX exposure
+regression of Section~\ref{sec:slx} tests the same mechanism directly, by asking
+whether deregulation in other states predicts a county's own credit growth
+when those states are connected to it through cross-state bank links.
+Table~\ref{tab:slx} reports the exposure coefficient $\beta_E$ for the main and
+placebo outcomes.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Bank-network exposure to out-of-state deregulation.}
+  \label{tab:slx}
+  \begin{tabular}{lccc}
+    \toprule
+    Sample & $\hat\beta_E$, bank credit & Perm. $p$ & $\hat\beta_E$, placebo \\
+    \midrule
+    Full & $0.016^{**}$ & $0.239$ & $0.021^{***}$ \\
+    Contig & $0.031^{***}$ & $0.036$ & $0.009$ \\
+    Non-contig & $0.003$ & $0.898$ & $0.026^{***}$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Exposure uses the row-standardised interstate bank-network matrix.
+  \end{tablenotes}
+\end{table}
+
+
+The cleanest evidence is in the contiguous sample, and it is internally
+consistent with the SEM. There, cross-state bank exposure is positive and
+significant for commercial-bank credit ($\hat\beta_E = 0.031$, permutation
+$p=0.036$) while the placebo exposure is small and insignificant
+($\hat\beta_E = 0.009$): out-of-state deregulation transmitted through bank links
+predicts commercial-bank lending but not the lending of institutions the reform
+did not cover, as the exclusion restriction requires. In the broad samples the
+picture is more guarded and should be reported as a limitation. In the full and
+non-contiguous samples the placebo exposure is itself significant
+($0.021$ and $0.026$), which means that in heterogeneous, non-border counties the
+exposure variable also picks up general regional credit conditions, not the bank
+channel alone. This is the same logic that makes the contiguous sample the
+preferred specification throughout: only there do neighbouring counties share an
+economy closely enough for the cross-state comparison to isolate the policy
+shock. The reduced-form check thus supports the bank-network mechanism where
+identification is strongest and flags demand contamination where it is weakest,
+rather than claiming a clean effect everywhere.
+% [NEW END]
+
+\subsection{What the bank network does, and does not, change for inference}
+\label{sec:inference-results}
+
+A final question is whether allowing bank-network error correlation changes what
+can be said about the deregulation coefficient itself. Holding the point estimate
+fixed and varying only the covariance estimator (Appendix
+Table~\ref{tab:conley}), the deregulation effect is robustly significant in the
+contiguous sample under every standard --- state clustering, geographic Bartlett
+HAC, the bank-network band, and the multiway combination all leave it significant.
+In the broader samples it is significant under the spatial-HAC kernels but only
+marginal under state clustering, because the treatment varies at the state-year
+level and clustering on state absorbs most of its identifying variation.
+
+The multiway (state $+$ bank-network) standard error is numerically very close to
+the state-clustered one. This is not a null result but the prediction of
+Section~\ref{sec:hac} borne out: because deregulation is a state-year variable,
+there is little cross-state variance left for the bank network to add to the
+sampling distribution of $\hat\beta_1$, even though the same network demonstrably
+shapes the \emph{error process} estimated in Section~\ref{sec:sem-results}. The
+distinction matters for how the contribution is framed. The bank network changes
+the \emph{geometry} of how unexplained credit shocks co-move and how far they
+travel; it does not materially change the precision of, or the conclusion about,
+the average deregulation effect. The thesis claims the former and is careful not
+to over-claim the latter.
+
+\subsection{Synthesis}
+\label{sec:synthesis}
+
+Taken together, the results answer the research question in the affirmative but
+with calibrated magnitudes. The geographic structure of bank branch networks does
+shape the spatial transmission of credit-supply shocks: residual credit-growth
+dependence, outcome spillovers, the geographic reach of the multiplier, and the
+direct reduced-form exposure effect all line up more closely with shared bank
+ownership than with physical proximity, and the signal concentrates in the
+cross-state links that the IBBEA opened and that Favara and Imbs (2015) trace to
+out-of-state banks with local branches. At the same time, two honest qualifications
+run through the evidence. The raw magnitudes --- the $0.45$ error-parameter gap and
+the twenty-fold reach --- are substantially inflated by the bank network's far
+greater density; the density-matched comparisons put the genuine advantage at a
+smaller but still significant level. And the bank network reshapes the structure
+of spillovers rather than the size or precision of the average treatment effect,
+which remains anchored in the Favara--Imbs benchmark. The contribution is thus a
+sharper map of \emph{how} a known credit-supply shock diffuses across space, with
+the cleanest evidence emerging exactly in the border-MSA sample where the
+underlying identification is strongest.
+
+\section{Discussion}\label{sec:disc}
+
+% ======================= 7. CONCLUSION =======================
+\section{Conclusion and Future Directions}\label{sec:concl}
+
+
+\clearpage
+
+\bibliographystyle{apalike} 
+\bibliography{MyReferencesFile}
+
+\clearpage
+
+\appendix
+\section{Full results}
+\label{app:results}
+ 
+% ---------------------------------------------------------------------
+\subsection{Commercial banks versus placebo lenders}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Deregulation and credit growth: commercial banks versus placebo lenders (full sample, five outcomes).}
+  \label{tab:placebo-full}
+  \small
+  \begin{tabular}{lccccc}
+    \toprule
+     & \# mortgages & Mortgage volume & Denials & Loan-to-income & Loans sold \\
+    \midrule
+    \multicolumn{6}{l}{\emph{Panel A. Commercial banks}}\\
+    Deregulation & $0.028^{**}$ & $0.029^{**}$ & $0.013$ & $0.029^{**}$ & $0.008$ \\
+                 & $(0.011)$ & $(0.012)$ & $(0.019)$ & $(0.012)$ & $(0.013)$ \\
+    \addlinespace
+    \multicolumn{6}{l}{\emph{Panel B. Independent mortgage cos., thrifts, credit unions}}\\
+    Deregulation & $0.002$ & $0.001$ & $0.011$ & $0.001$ & $-0.015$ \\
+                 & $(0.009)$ & $(0.008)$ & $(0.016)$ & $(0.008)$ & $(0.011)$ \\
+    Test (Panel A $=$ Panel B) & $[0.065]$ & $[0.055]$ & $[0.912]$ & $[0.059]$ & $[0.185]$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Dependent variables are log changes in mortgage outcomes. Two-way fixed effects; standard errors clustered by state. Test row reports p-values for equality of Panel A and Panel B coefficients.
+  \end{tablenotes}
+\end{table}
+
+\clearpage
+
+\subsection{The importance of bank location and of bank branches}
+
+\begin{table}[htbp]
+  \centering
+  \caption{The importance of bank location and of bank branches (full sample).}
+  \label{tab:banktype-full}
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+     & OOS, local branch & OOS, no branch & In-state \\
+    \midrule
+    \# mortgages originated & $0.161^{***}$ & $0.016$ & $0.003$ \\
+                            & $(0.060)$ & $(0.011)$\,[0.016] & $(0.010)$\,[0.013] \\
+                            & {\scriptsize $4,514$/$767$} & {\scriptsize $9,988$/$1,018$} & {\scriptsize $9,841$/$1,017$} \\
+    \addlinespace
+    Volume of mortgages & $0.167^{***}$ & $0.015$ & $-0.003$ \\
+                            & $(0.061)$ & $(0.011)$\,[0.011] & $(0.011)$\,[0.007] \\
+                            & {\scriptsize $4,514$/$767$} & {\scriptsize $9,988$/$1,018$} & {\scriptsize $9,841$/$1,017$} \\
+    \addlinespace
+    Denial rate & $0.069$ & $0.012$ & $0.005$ \\
+                            & $(0.058)$ & $(0.024)$\,[0.370] & $(0.015)$\,[0.306] \\
+                            & {\scriptsize $4,108$/$738$} & {\scriptsize $9,926$/$1,018$} & {\scriptsize $9,339$/$1,005$} \\
+    \addlinespace
+    Loan-to-income ratio & $0.165^{***}$ & $0.014$ & $-0.003$ \\
+                            & $(0.060)$ & $(0.011)$\,[0.011] & $(0.011)$\,[0.007] \\
+                            & {\scriptsize $4,513$/$767$} & {\scriptsize $9,987$/$1,018$} & {\scriptsize $9,840$/$1,017$} \\
+    \addlinespace
+    \# loans sold & $0.055$ & $0.010$ & $-0.025$ \\
+                            & $(0.081)$ & $(0.014)$\,[0.564] & $(0.019)$\,[0.356] \\
+                            & {\scriptsize $3,356$/$700$} & {\scriptsize $9,771$/$1,017$} & {\scriptsize $9,175$/$1,006$} \\
+    \addlinespace
+    \# local branches & $0.077^{***}$ & --- & $0.001$ \\
+                            & $(0.029)$ & --- & $(0.007)$\,[0.012] \\
+                            & {\scriptsize $4,783$/$790$} & --- & {\scriptsize $9,019$/$978$} \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Bracketed values are p-values for equality with the out-of-state local-branch coefficient where available.
+  \end{tablenotes}
+\end{table}
+
+% ---- CONTIGUOUS SAMPLE ----
+\begin{table}[htbp]
+  \centering
+  \caption{The importance of bank location and of bank branches (contiguous-county sample).}
+  \label{tab:banktype-contig}
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+     & OOS, local branch & OOS, no branch & In-state \\
+    \midrule
+    \# mortgages originated & $0.162^{**}$ & $0.013$ & $0.030^{*}$ \\
+                            & $(0.082)$ & $(0.009)$\,[0.059] & $(0.018)$\,[0.108] \\
+                            & {\scriptsize $1,348$/$225$} & {\scriptsize $2,630$/$267$} & {\scriptsize $2,583$/$266$} \\
+    \addlinespace
+    Volume of mortgages & $0.186^{**}$ & $0.013$ & $0.026$ \\
+                            & $(0.089)$ & $(0.010)$\,[0.044] & $(0.020)$\,[0.062] \\
+                            & {\scriptsize $1,348$/$225$} & {\scriptsize $2,630$/$267$} & {\scriptsize $2,583$/$266$} \\
+    \addlinespace
+    Denial rate & $0.071$ & $-0.011$ & $0.003$ \\
+                            & $(0.087)$ & $(0.022)$\,[0.371] & $(0.028)$\,[0.440] \\
+                            & {\scriptsize $1,192$/$215$} & {\scriptsize $2,613$/$267$} & {\scriptsize $2,473$/$264$} \\
+    \addlinespace
+    Loan-to-income ratio & $0.187^{**}$ & $0.013$ & $0.027$ \\
+                            & $(0.088)$ & $(0.011)$\,[0.041] & $(0.020)$\,[0.059] \\
+                            & {\scriptsize $1,348$/$225$} & {\scriptsize $2,630$/$267$} & {\scriptsize $2,583$/$266$} \\
+    \addlinespace
+    \# loans sold & $0.118$ & $0.017$ & $-0.030$ \\
+                            & $(0.137)$ & $(0.010)$\,[0.454] & $(0.030)$\,[0.237] \\
+                            & {\scriptsize $897$/$199$} & {\scriptsize $2,586$/$267$} & {\scriptsize $2,345$/$262$} \\
+    \addlinespace
+    \# local branches & $0.103^{***}$ & --- & $-0.008$ \\
+                            & $(0.039)$ & --- & $(0.010)$\,[0.013] \\
+                            & {\scriptsize $1,423$/$230$} & --- & {\scriptsize $2,424$/$259$} \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Bracketed values are p-values for equality with the out-of-state local-branch coefficient where available.
+  \end{tablenotes}
+\end{table}
+
+ 
+ 
+% ---- NON-CONTIGUOUS SAMPLE ----
+\begin{table}[htbp]
+  \centering
+  \caption{The importance of bank location and of bank branches (non-contiguous sample).}
+  \label{tab:banktype-noncontig}
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+     & OOS, local branch & OOS, no branch & In-state \\
+    \midrule
+    \# mortgages originated & $0.195^{**}$ & $0.016$ & $-0.005$ \\
+                            & $(0.077)$ & $(0.014)$\,[0.023] & $(0.011)$\,[0.013] \\
+                            & {\scriptsize $3,166$/$542$} & {\scriptsize $7,358$/$751$} & {\scriptsize $7,258$/$751$} \\
+    \addlinespace
+    Volume of mortgages & $0.180^{**}$ & $0.015$ & $-0.012$ \\
+                            & $(0.076)$ & $(0.013)$\,[0.031] & $(0.012)$\,[0.016] \\
+                            & {\scriptsize $3,166$/$542$} & {\scriptsize $7,358$/$751$} & {\scriptsize $7,258$/$751$} \\
+    \addlinespace
+    Denial rate & $0.089$ & $0.019$ & $0.005$ \\
+                            & $(0.065)$ & $(0.027)$\,[0.319] & $(0.016)$\,[0.211] \\
+                            & {\scriptsize $2,916$/$523$} & {\scriptsize $7,313$/$751$} & {\scriptsize $6,866$/$741$} \\
+    \addlinespace
+    Loan-to-income ratio & $0.178^{**}$ & $0.014$ & $-0.013$ \\
+                            & $(0.075)$ & $(0.014)$\,[0.033] & $(0.012)$\,[0.017] \\
+                            & {\scriptsize $3,165$/$542$} & {\scriptsize $7,357$/$751$} & {\scriptsize $7,257$/$751$} \\
+    \addlinespace
+    \# loans sold & $0.028$ & $0.007$ & $-0.023$ \\
+                            & $(0.097)$ & $(0.015)$\,[0.822] & $(0.021)$\,[0.621] \\
+                            & {\scriptsize $2,459$/$501$} & {\scriptsize $7,185$/$750$} & {\scriptsize $6,830$/$744$} \\
+    \addlinespace
+    \# local branches & $0.074^{**}$ & --- & $0.006$ \\
+                            & $(0.031)$ & --- & $(0.007)$\,[0.027] \\
+                            & {\scriptsize $3,360$/$560$} & --- & {\scriptsize $6,595$/$719$} \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Bracketed values are p-values for equality with the out-of-state local-branch coefficient where available.
+  \end{tablenotes}
+\end{table}
+
+\clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{Residual spatial dependence (Moran's I)}
+\begin{table}[htbp]
+  \centering
+  \caption{Year-by-year residual Moran's $I$ by weights matrix.}
+  \label{tab:moran-yearly}
+  \scriptsize
+  \begin{tabular}{lccccccccccccc}
+    \toprule
+    Year & $W_{\text{geo}}$ & $W_{\text{bank}}$ & $W_{\text{bank,count}}$ & $W_{\text{bank,bin}}$ & $W_{\text{bank,knn3}}$ & $W_{\text{bank,knn4}}$ & $W_{\text{bank,count,knn3}}$ & $W_{\text{bank,count,knn4}}$ & $W_{\text{bank,bin,knn3}}$ & $W_{\text{bank,bin,knn4}}$ & $W_{\text{bank,nonGeo}}$ & $W_{\text{bank,inter}}$ & $W_{\text{bank,intra}}$ \\
+    \midrule
+    1995 & $0.134^{***}$ & $0.034^{***}$ & $0.032^{***}$ & $0.017^{***}$ & $0.091^{***}$ & $0.085^{***}$ & $0.050^{**}$ & $0.044^{**}$ & $0.046^{**}$ & $0.040^{**}$ & $0.018^{***}$ & $0.011^{**}$ & $0.066^{***}$ \\
+    1996 & $0.110^{***}$ & $0.023^{***}$ & $0.016^{**}$ & $0.002$ & $0.109^{***}$ & $0.111^{***}$ & $0.046^{**}$ & $0.040^{**}$ & $0.052^{***}$ & $0.042^{**}$ & $0.023^{***}$ & $-0.001$ & $0.081^{***}$ \\
+    1997 & $0.084^{***}$ & $0.030^{***}$ & $0.031^{***}$ & $0.011^{**}$ & $0.078^{***}$ & $0.078^{***}$ & $0.056^{***}$ & $0.053^{***}$ & $0.054^{***}$ & $0.049^{***}$ & $0.020^{**}$ & $0.022^{***}$ & $0.065^{***}$ \\
+    1998 & $0.167^{***}$ & $0.055^{***}$ & $0.054^{***}$ & $0.016^{***}$ & $0.169^{***}$ & $0.151^{***}$ & $0.095^{***}$ & $0.094^{***}$ & $0.087^{***}$ & $0.081^{***}$ & $0.035^{***}$ & $0.020^{***}$ & $0.103^{***}$ \\
+    1999 & $0.265^{***}$ & $0.070^{***}$ & $0.072^{***}$ & $0.027^{***}$ & $0.203^{***}$ & $0.195^{***}$ & $0.150^{***}$ & $0.136^{***}$ & $0.150^{***}$ & $0.136^{***}$ & $0.061^{***}$ & $0.016^{***}$ & $0.185^{***}$ \\
+    2000 & $0.238^{***}$ & $0.040^{***}$ & $0.039^{***}$ & $0.006$ & $0.180^{***}$ & $0.180^{***}$ & $0.099^{***}$ & $0.096^{***}$ & $0.087^{***}$ & $0.084^{***}$ & $0.010^{*}$ & $-0.002$ & $0.112^{***}$ \\
+    2001 & $0.213^{***}$ & $0.074^{***}$ & $0.085^{***}$ & $0.040^{***}$ & $0.185^{***}$ & $0.189^{***}$ & $0.146^{***}$ & $0.140^{***}$ & $0.141^{***}$ & $0.130^{***}$ & $0.068^{***}$ & $0.032^{***}$ & $0.146^{***}$ \\
+    2002 & $0.162^{***}$ & $0.028^{***}$ & $0.031^{***}$ & $0.011^{**}$ & $0.119^{***}$ & $0.109^{***}$ & $0.070^{***}$ & $0.061^{***}$ & $0.063^{***}$ & $0.052^{***}$ & $0.037^{***}$ & $-0.001$ & $0.066^{***}$ \\
+    2003 & $0.084^{***}$ & $0.057^{***}$ & $0.064^{***}$ & $0.015^{***}$ & $0.159^{***}$ & $0.138^{***}$ & $0.123^{***}$ & $0.112^{***}$ & $0.099^{***}$ & $0.082^{***}$ & $0.039^{***}$ & $0.012^{**}$ & $0.110^{***}$ \\
+    2004 & $0.184^{***}$ & $0.063^{***}$ & $0.061^{***}$ & $0.033^{***}$ & $0.149^{***}$ & $0.133^{***}$ & $0.090^{***}$ & $0.092^{***}$ & $0.075^{***}$ & $0.079^{***}$ & $0.024^{***}$ & $-0.007$ & $0.116^{***}$ \\
+    2005 & $0.220^{***}$ & $0.038^{***}$ & $0.044^{***}$ & $0.003$ & $0.202^{***}$ & $0.183^{***}$ & $0.117^{***}$ & $0.111^{***}$ & $0.110^{***}$ & $0.102^{***}$ & $0.025^{***}$ & $0.008^{*}$ & $0.119^{***}$ \\
+    \midrule
+    Mean & $0.169$ & $0.047$ & $0.048$ & $0.016$ & $0.149$ & $0.141$ & $0.095$ & $0.089$ & $0.088$ & $0.080$ & $0.033$ & $0.010$ & $0.106$ \\
+    Sig.\ years & $11/11$ & $11/11$ & $11/11$ & $8/11$ & $11/11$ & $11/11$ & $11/11$ & $11/11$ & $11/11$ & $11/11$ & $10/11$ & $6/11$ & $11/11$ \\
+    Density (\%) & $0.33$ & $40.28$ & $40.28$ & $40.28$ & $0.29$ & $0.38$ & $0.29$ & $0.38$ & $0.29$ & $0.38$ & $39.97$ & $37.63$ & $2.65$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Permutation p-values use 999 permutations.
+  \end{tablenotes}
+\end{table}
+
+
+\clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{LM diagnostics}
+\begin{table}[htbp]
+  \centering
+  \caption{LM diagnostics for spatial error and spatial lag dependence.}
+  \label{tab:lm}
+  \footnotesize
+  \begin{tabular}{llccccc}
+    \toprule
+    Sample & $W$ & LM err. & LM lag & Robust err. & Robust lag & Decision \\
+    \midrule
+    Full & $W_{\text{geo}}$ & $280.0^{***}$ & $4.4^{**}$ & $23.4^{***}$ & $5.1^{**}$ & SEM \\
+    Full & $W_{\text{bank}}$ & $236.2^{***}$ & $69.7^{***}$ & $3.2^{*}$ & $2.8^{*}$ & Indeterminate \\
+    Full & $W_{\text{bank,count}}$ & $188.4^{***}$ & $49.7^{***}$ & $1.5$ & $3.7^{*}$ & Indeterminate \\
+    Full & $W_{\text{bank,bin}}$ & $48.4^{***}$ & $35.7^{***}$ & $7.2^{***}$ & $19.8^{***}$ & SAR \\
+    Full & $W_{\text{bank,knn3}}$ & $249.2^{***}$ & $4.9^{**}$ & $38.6^{***}$ & $13.9^{***}$ & SEM \\
+    Full & $W_{\text{bank,knn4}}$ & $280.7^{***}$ & $7.1^{***}$ & $38.4^{***}$ & $11.2^{***}$ & SEM \\
+    Full & $W_{\text{bank,count,knn3}}$ & $102.4^{***}$ & $3.0^{*}$ & $6.2^{**}$ & $0.9$ & SEM \\
+    Full & $W_{\text{bank,count,knn4}}$ & $108.5^{***}$ & $4.0^{**}$ & $7.0^{***}$ & $0.9$ & SEM \\
+    Full & $W_{\text{bank,bin,knn3}}$ & $102.2^{***}$ & $3.3^{*}$ & $4.0^{**}$ & $0.1$ & SEM \\
+    Full & $W_{\text{bank,bin,knn4}}$ & $110.9^{***}$ & $4.6^{**}$ & $4.6^{**}$ & $0.2$ & SEM \\
+    Full & $W_{\text{bank,nonGeo}}$ & $131.1^{***}$ & $49.7^{***}$ & $2.4$ & $1.8$ & Indeterminate \\
+    Full & $W_{\text{bank,inter}}$ & $34.2^{***}$ & $26.7^{***}$ & $1.7$ & $10.0^{***}$ & SAR \\
+    Full & $W_{\text{bank,intra}}$ & $408.9^{***}$ & $24.5^{***}$ & $68.1^{***}$ & $21.1^{***}$ & SEM \\
+    \addlinespace
+    Contig & $W_{\text{geo}}$ & $22.1^{***}$ & $1.5$ & $0.3$ & $1.8$ & SEM \\
+    Contig & $W_{\text{bank}}$ & $24.9^{***}$ & $17.0^{***}$ & $21.5^{***}$ & $34.7^{***}$ & SAR \\
+    Contig & $W_{\text{bank,count}}$ & $20.8^{***}$ & $13.5^{***}$ & $27.1^{***}$ & $40.1^{***}$ & SAR \\
+    Contig & $W_{\text{bank,bin}}$ & $0.7$ & $6.4^{**}$ & $45.0^{***}$ & $51.1^{***}$ & SAR \\
+    Contig & $W_{\text{bank,knn3}}$ & $27.6^{***}$ & $1.8$ & $0.0$ & $1.1$ & SEM \\
+    Contig & $W_{\text{bank,knn4}}$ & $24.8^{***}$ & $1.8$ & $0.1$ & $0.5$ & SEM \\
+    Contig & $W_{\text{bank,count,knn3}}$ & $10.3^{***}$ & $1.1$ & $8.1^{***}$ & $11.6^{***}$ & SEM \\
+    Contig & $W_{\text{bank,count,knn4}}$ & $9.0^{***}$ & $1.0$ & $9.0^{***}$ & $12.6^{***}$ & SEM \\
+    Contig & $W_{\text{bank,bin,knn3}}$ & $9.2^{***}$ & $1.1$ & $7.6^{***}$ & $11.0^{***}$ & SEM \\
+    Contig & $W_{\text{bank,bin,knn4}}$ & $7.9^{***}$ & $1.0$ & $7.8^{***}$ & $11.1^{***}$ & SEM \\
+    Contig & $W_{\text{bank,nonGeo}}$ & $6.5^{**}$ & $7.2^{***}$ & $18.3^{***}$ & $26.0^{***}$ & SAR \\
+    Contig & $W_{\text{bank,inter}}$ & $11.2^{***}$ & $11.6^{***}$ & $19.5^{***}$ & $30.1^{***}$ & SAR \\
+    Contig & $W_{\text{bank,intra}}$ & $23.4^{***}$ & $2.7^{*}$ & $0.0$ & $1.0$ & SEM \\
+    \addlinespace
+    Non-contig & $W_{\text{geo}}$ & $257.7^{***}$ & $4.7^{**}$ & $45.9^{***}$ & $17.5^{***}$ & SEM \\
+    Non-contig & $W_{\text{bank}}$ & $194.8^{***}$ & $63.2^{***}$ & $17.9^{***}$ & $1.6$ & SEM \\
+    Non-contig & $W_{\text{bank,count}}$ & $167.2^{***}$ & $48.1^{***}$ & $14.4^{***}$ & $0.7$ & SEM \\
+    Non-contig & $W_{\text{bank,bin}}$ & $38.3^{***}$ & $28.9^{***}$ & $0.0$ & $2.7$ & Indeterminate \\
+    Non-contig & $W_{\text{bank,knn3}}$ & $220.2^{***}$ & $5.2^{**}$ & $40.3^{***}$ & $15.5^{***}$ & SEM \\
+    Non-contig & $W_{\text{bank,knn4}}$ & $258.1^{***}$ & $7.6^{***}$ & $37.1^{***}$ & $11.5^{***}$ & SEM \\
+    Non-contig & $W_{\text{bank,count,knn3}}$ & $86.2^{***}$ & $2.7$ & $18.0^{***}$ & $8.0^{***}$ & SEM \\
+    Non-contig & $W_{\text{bank,count,knn4}}$ & $90.3^{***}$ & $3.4^{*}$ & $17.7^{***}$ & $7.3^{***}$ & SEM \\
+    Non-contig & $W_{\text{bank,bin,knn3}}$ & $85.9^{***}$ & $2.9^{*}$ & $14.8^{***}$ & $5.7^{**}$ & SEM \\
+    Non-contig & $W_{\text{bank,bin,knn4}}$ & $92.1^{***}$ & $3.8^{**}$ & $15.1^{***}$ & $5.4^{**}$ & SEM \\
+    Non-contig & $W_{\text{bank,nonGeo}}$ & $128.5^{***}$ & $57.8^{***}$ & $6.5^{**}$ & $0.0$ & SEM \\
+    Non-contig & $W_{\text{bank,inter}}$ & $8.4^{***}$ & $7.9^{***}$ & $0.1$ & $0.4$ & Indeterminate \\
+    Non-contig & $W_{\text{bank,intra}}$ & $357.1^{***}$ & $24.2^{***}$ & $70.1^{***}$ & $22.9^{***}$ & SEM \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} LM test statistics with p-value stars.
+  \end{tablenotes}
+\end{table}
+
+\clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{Spatial error model: all matrices and samples}
+\begin{table}[htbp]
+  \centering
+  \caption{Full SEM robustness table across geographic and bank-network weight matrices.}
+  \label{tab:sem-full}
+  \footnotesize
+  \begin{tabular}{llccc}
+    \toprule
+    Sample & Weight matrix & $\hat\beta_1$ & $\hat\lambda$ & Gap vs.\ $W_{\text{geo}}$ \\
+    \midrule
+    Full & $W_{\text{geo}}$ & $0.026^{***}\,(0.005)$ & $0.186^{***}\,(0.011)$ & -- \\
+     & $W_{\text{bank}}$ & $0.018^{***}\,(0.005)$ & $0.634^{***}\,(0.037)$ & $0.449\ (z{=}11.66)^{***}$ \\
+     & $W_{\text{bank,count}}$ & $0.019^{***}\,(0.005)$ & $0.648^{***}\,(0.033)$ & $0.463\ (z{=}13.22)^{***}$ \\
+     & $W_{\text{bank,bin}}$ & $0.022^{***}\,(0.004)$ & $0.408^{***}\,(0.061)$ & $0.222\ (z{=}3.56)^{***}$ \\
+     & $W_{\text{bank,knn3}}$ & $0.026^{***}\,(0.005)$ & $0.228^{***}\,(0.012)$ & $0.042\ (z{=}2.59)^{***}$ \\
+     & $W_{\text{bank,knn4}}$ & $0.025^{***}\,(0.005)$ & $0.264^{***}\,(0.013)$ & $0.078\ (z{=}4.54)^{***}$ \\
+     & $W_{\text{bank,count,knn3}}$ & $0.026^{***}\,(0.005)$ & $0.353^{***}\,(0.013)$ & $0.167\ (z{=}9.95)^{***}$ \\
+     & $W_{\text{bank,count,knn4}}$ & $0.026^{***}\,(0.005)$ & $0.366^{***}\,(0.014)$ & $0.180\ (z{=}10.17)^{***}$ \\
+     & $W_{\text{bank,bin,knn3}}$ & $0.026^{***}\,(0.005)$ & $0.349^{***}\,(0.013)$ & $0.163\ (z{=}9.51)^{***}$ \\
+     & $W_{\text{bank,bin,knn4}}$ & $0.026^{***}\,(0.005)$ & $0.378^{***}\,(0.014)$ & $0.192\ (z{=}10.60)^{***}$ \\
+     & $W_{\text{bank,nonGeo}}$ & $0.017^{***}\,(0.005)$ & $0.520^{***}\,(0.046)$ & $0.333\ (z{=}7.10)^{***}$ \\
+     & $W_{\text{bank,inter}}$ & $0.017^{***}\,(0.004)$ & $0.315^{***}\,(0.064)$ & $0.128\ (z{=}1.98)^{**}$ \\
+     & $W_{\text{bank,intra}}$ & $0.030^{***}\,(0.006)$ & $0.349^{***}\,(0.018)$ & $0.163\ (z{=}7.88)^{***}$ \\
+    \addlinespace
+    Contig & $W_{\text{geo}}$ & $0.037^{***}\,(0.007)$ & $0.113^{***}\,(0.022)$ & -- \\
+     & $W_{\text{bank}}$ & $0.028^{***}\,(0.007)$ & $0.353^{***}\,(0.052)$ & $0.239\ (z{=}4.26)^{***}$ \\
+     & $W_{\text{bank,count}}$ & $0.028^{***}\,(0.007)$ & $0.370^{***}\,(0.048)$ & $0.257\ (z{=}4.89)^{***}$ \\
+     & $W_{\text{bank,bin}}$ & $0.036^{***}\,(0.007)$ & $0.123\,(0.085)$ & $0.009\ (z{=}0.11)$ \\
+     & $W_{\text{bank,knn3}}$ & $0.040^{***}\,(0.007)$ & $0.158^{***}\,(0.021)$ & $0.044\ (z{=}1.44)^{*}$ \\
+     & $W_{\text{bank,knn4}}$ & $0.038^{***}\,(0.007)$ & $0.138^{***}\,(0.023)$ & $0.024\ (z{=}0.76)$ \\
+     & $W_{\text{bank,count,knn3}}$ & $0.035^{***}\,(0.007)$ & $0.199^{***}\,(0.024)$ & $0.085\ (z{=}2.62)^{***}$ \\
+     & $W_{\text{bank,count,knn4}}$ & $0.034^{***}\,(0.007)$ & $0.195^{***}\,(0.024)$ & $0.082\ (z{=}2.50)^{***}$ \\
+     & $W_{\text{bank,bin,knn3}}$ & $0.035^{***}\,(0.007)$ & $0.183^{***}\,(0.024)$ & $0.069\ (z{=}2.11)^{**}$ \\
+     & $W_{\text{bank,bin,knn4}}$ & $0.034^{***}\,(0.007)$ & $0.181^{***}\,(0.025)$ & $0.068\ (z{=}2.04)^{**}$ \\
+     & $W_{\text{bank,nonGeo}}$ & $0.029^{***}\,(0.007)$ & $0.168^{***}\,(0.061)$ & $0.050\ (z{=}0.77)$ \\
+     & $W_{\text{bank,inter}}$ & $0.022^{***}\,(0.006)$ & $0.269^{***}\,(0.060)$ & $0.163\ (z{=}2.53)^{***}$ \\
+     & $W_{\text{bank,intra}}$ & $0.039^{***}\,(0.007)$ & $0.147^{***}\,(0.028)$ & $0.034\ (z{=}0.95)$ \\
+    \addlinespace
+    Non-contig & $W_{\text{geo}}$ & $0.024^{***}\,(0.006)$ & $0.201^{***}\,(0.012)$ & -- \\
+     & $W_{\text{bank}}$ & $0.018^{***}\,(0.006)$ & $0.613^{***}\,(0.040)$ & $0.412\ (z{=}9.82)^{***}$ \\
+     & $W_{\text{bank,count}}$ & $0.019^{***}\,(0.006)$ & $0.627^{***}\,(0.036)$ & $0.426\ (z{=}11.22)^{***}$ \\
+     & $W_{\text{bank,bin}}$ & $0.019^{***}\,(0.005)$ & $0.391^{***}\,(0.067)$ & $0.190\ (z{=}2.79)^{***}$ \\
+     & $W_{\text{bank,knn3}}$ & $0.022^{***}\,(0.006)$ & $0.236^{***}\,(0.013)$ & $0.034\ (z{=}1.93)^{**}$ \\
+     & $W_{\text{bank,knn4}}$ & $0.021^{***}\,(0.006)$ & $0.274^{***}\,(0.014)$ & $0.073\ (z{=}3.89)^{***}$ \\
+     & $W_{\text{bank,count,knn3}}$ & $0.025^{***}\,(0.007)$ & $0.366^{***}\,(0.014)$ & $0.165\ (z{=}9.05)^{***}$ \\
+     & $W_{\text{bank,count,knn4}}$ & $0.025^{***}\,(0.007)$ & $0.362^{***}\,(0.015)$ & $0.161\ (z{=}8.41)^{***}$ \\
+     & $W_{\text{bank,bin,knn3}}$ & $0.025^{***}\,(0.007)$ & $0.364^{***}\,(0.014)$ & $0.162\ (z{=}8.77)^{***}$ \\
+     & $W_{\text{bank,bin,knn4}}$ & $0.024^{***}\,(0.007)$ & $0.369^{***}\,(0.015)$ & $0.168\ (z{=}8.58)^{***}$ \\
+     & $W_{\text{bank,nonGeo}}$ & $0.017^{***}\,(0.006)$ & $0.550^{***}\,(0.049)$ & $0.348\ (z{=}6.95)^{***}$ \\
+     & $W_{\text{bank,inter}}$ & $0.016^{***}\,(0.005)$ & $0.148^{*}\,(0.082)$ & $-0.056\ (z{=}-0.68)$ \\
+     & $W_{\text{bank,intra}}$ & $0.024^{***}\,(0.007)$ & $0.340^{***}\,(0.019)$ & $0.139\ (z{=}6.22)^{***}$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Entries report coefficient estimates with standard errors in parentheses. The four count/binary KNN rows hold density fixed while changing the link ranking or weighting scheme.
+  \end{tablenotes}
+\end{table}
+
+\clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{Link-restriction gradient}
+\begin{table}[htbp]
+  \centering
+  \caption{Cross-state versus within-state bank links and the non-geographic network.}
+  \label{tab:linkrestrict}
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+    Matrix & Full & Contig & Non-contig \\
+    \midrule
+    $W_{\text{bank,knn3}}$ & $0.228^{***}$ & $0.158^{***}$ & $0.236^{***}$ \\
+    $W_{\text{bank,knn4}}$ & $0.264^{***}$ & $0.138^{***}$ & $0.274^{***}$ \\
+    $W_{\text{bank,nonGeo}}$ & $0.520^{***}$ & $0.168^{***}$ & $0.550^{***}$ \\
+    $W_{\text{bank,inter}}$ & $0.315^{***}$ & $0.269^{***}$ & $0.148^{*}$ \\
+    $W_{\text{bank,intra}}$ & $0.349^{***}$ & $0.147^{***}$ & $0.340^{***}$ \\
+    $W_{\text{geo}}$ & $0.186^{***}$ & $0.113^{***}$ & $0.201^{***}$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Entries are SEM spatial-error parameters.
+  \end{tablenotes}
+\end{table}
+ 
+% ---------------------------------------------------------------------
+\subsection{KNN density sweep}
+
+Table~\ref{tab:knn-type} isolates the role of weighting scheme: across both
+$k=3$ and $k=4$, the continuous, count, and binary specifications deliver
+positive $\hat\lambda$ gaps, showing that the density-matched bank-network
+result is not driven only by the continuous calibration of link strength.
+
+\begin{table}[htbp]
+  \centering
+  \caption{KNN density sweep for continuous, count, and binary bank-network SEM specifications.}
+  \label{tab:knn}
+  \scriptsize
+  \begin{tabular}{rlrrrrrrr}
+    \toprule
+    $k$ & Type & Avg. nbrs & $\hat\lambda_F$ & Gap$_F$ & $\hat\lambda_C$ & Gap$_C$ & $\hat\lambda_N$ & Gap$_N$ \\
+    \midrule
+    1 & Continuous & $1.0$ & $0.131$ & $-0.055$ & $0.142$ & $0.028$ & $0.157$ & $-0.044$ \\
+    1 & Count & $1.0$ & $0.268$ & $0.082$ & $0.224$ & $0.111$ & $0.270$ & $0.068$ \\
+    1 & Binary & $1.0$ & $0.268$ & $0.082$ & $0.224$ & $0.111$ & $0.270$ & $0.068$ \\
+    \addlinespace
+    2 & Continuous & $2.0$ & $0.190$ & $0.004$ & $0.139$ & $0.026$ & $0.208$ & $0.006$ \\
+    2 & Count & $2.0$ & $0.331$ & $0.146$ & $0.171$ & $0.058$ & $0.345$ & $0.144$ \\
+    2 & Binary & $2.0$ & $0.329$ & $0.144$ & $0.161$ & $0.047$ & $0.350$ & $0.149$ \\
+    \addlinespace
+    3 & Continuous & $2.9$ & $0.228$ & $0.042$ & $0.158$ & $0.044$ & $0.236$ & $0.034$ \\
+    3 & Count & $2.9$ & $0.353$ & $0.167$ & $0.199$ & $0.085$ & $0.366$ & $0.165$ \\
+    3 & Binary & $2.9$ & $0.349$ & $0.163$ & $0.183$ & $0.069$ & $0.364$ & $0.162$ \\
+    \addlinespace
+    4 & Continuous & $3.9$ & $0.264$ & $0.078$ & $0.138$ & $0.024$ & $0.274$ & $0.073$ \\
+    4 & Count & $3.9$ & $0.366$ & $0.180$ & $0.195$ & $0.082$ & $0.362$ & $0.161$ \\
+    4 & Binary & $3.9$ & $0.378$ & $0.192$ & $0.181$ & $0.068$ & $0.369$ & $0.168$ \\
+    \addlinespace
+    5 & Continuous & $4.9$ & $0.280$ & $0.095$ & $0.137$ & $0.023$ & $0.278$ & $0.076$ \\
+    5 & Count & $4.9$ & $0.383$ & $0.197$ & $0.217$ & $0.103$ & $0.359$ & $0.157$ \\
+    5 & Binary & $4.9$ & $0.395$ & $0.210$ & $0.212$ & $0.098$ & $0.355$ & $0.154$ \\
+    \addlinespace
+    6 & Continuous & $5.8$ & $0.304$ & $0.118$ & $0.135$ & $0.022$ & $0.302$ & $0.101$ \\
+    6 & Count & $5.8$ & $0.408$ & $0.222$ & $0.239$ & $0.126$ & $0.382$ & $0.181$ \\
+    6 & Binary & $5.8$ & $0.429$ & $0.243$ & $0.249$ & $0.135$ & $0.391$ & $0.190$ \\
+    \addlinespace
+    7 & Continuous & $6.7$ & $0.332$ & $0.147$ & $0.138$ & $0.025$ & $0.327$ & $0.126$ \\
+    7 & Count & $6.7$ & $0.423$ & $0.237$ & $0.240$ & $0.126$ & $0.391$ & $0.190$ \\
+    7 & Binary & $6.7$ & $0.447$ & $0.262$ & $0.241$ & $0.128$ & $0.405$ & $0.204$ \\
+    \addlinespace
+    8 & Continuous & $7.7$ & $0.348$ & $0.163$ & $0.147$ & $0.034$ & $0.330$ & $0.129$ \\
+    8 & Count & $7.7$ & $0.456$ & $0.270$ & $0.239$ & $0.126$ & $0.424$ & $0.223$ \\
+    8 & Binary & $7.7$ & $0.494$ & $0.308$ & $0.237$ & $0.124$ & $0.455$ & $0.254$ \\
+    \addlinespace
+    9 & Continuous & $8.6$ & $0.373$ & $0.187$ & $0.157$ & $0.044$ & $0.354$ & $0.153$ \\
+    9 & Count & $8.6$ & $0.459$ & $0.274$ & $0.238$ & $0.125$ & $0.431$ & $0.230$ \\
+    9 & Binary & $8.6$ & $0.491$ & $0.306$ & $0.240$ & $0.127$ & $0.460$ & $0.259$ \\
+    \addlinespace
+    10 & Continuous & $9.6$ & $0.377$ & $0.191$ & $0.159$ & $0.046$ & $0.361$ & $0.160$ \\
+    10 & Count & $9.6$ & $0.471$ & $0.285$ & $0.251$ & $0.137$ & $0.441$ & $0.240$ \\
+    10 & Binary & $9.6$ & $0.505$ & $0.319$ & $0.252$ & $0.139$ & $0.471$ & $0.269$ \\
+    \addlinespace
+    11 & Continuous & $10.5$ & $0.383$ & $0.197$ & $0.163$ & $0.049$ & $0.366$ & $0.165$ \\
+    11 & Count & $10.5$ & $0.473$ & $0.288$ & $0.214$ & $0.100$ & $0.453$ & $0.251$ \\
+    11 & Binary & $10.5$ & $0.505$ & $0.320$ & $0.207$ & $0.094$ & $0.485$ & $0.284$ \\
+    \addlinespace
+    12 & Continuous & $11.4$ & $0.390$ & $0.205$ & $0.154$ & $0.040$ & $0.369$ & $0.167$ \\
+    12 & Count & $11.4$ & $0.483$ & $0.297$ & $0.219$ & $0.105$ & $0.467$ & $0.265$ \\
+    12 & Binary & $11.4$ & $0.518$ & $0.333$ & $0.216$ & $0.102$ & $0.506$ & $0.305$ \\
+    \addlinespace
+    13 & Continuous & $12.4$ & $0.403$ & $0.218$ & $0.159$ & $0.045$ & $0.381$ & $0.180$ \\
+    13 & Count & $12.4$ & $0.491$ & $0.305$ & $0.221$ & $0.107$ & $0.472$ & $0.270$ \\
+    13 & Binary & $12.4$ & $0.526$ & $0.341$ & $0.220$ & $0.106$ & $0.508$ & $0.307$ \\
+    \addlinespace
+    14 & Continuous & $13.3$ & $0.410$ & $0.224$ & $0.203$ & $0.089$ & $0.389$ & $0.188$ \\
+    14 & Count & $13.3$ & $0.499$ & $0.314$ & $0.220$ & $0.107$ & $0.480$ & $0.278$ \\
+    14 & Binary & $13.3$ & $0.538$ & $0.352$ & $0.220$ & $0.106$ & $0.518$ & $0.317$ \\
+    \addlinespace
+    15 & Continuous & $14.2$ & $0.418$ & $0.232$ & $0.191$ & $0.077$ & $0.406$ & $0.205$ \\
+    15 & Count & $14.2$ & $0.510$ & $0.324$ & $0.224$ & $0.111$ & $0.495$ & $0.294$ \\
+    15 & Binary & $14.2$ & $0.552$ & $0.366$ & $0.228$ & $0.115$ & $0.541$ & $0.340$ \\
+    \addlinespace
+    16 & Continuous & $15.1$ & $0.424$ & $0.238$ & $0.197$ & $0.083$ & $0.411$ & $0.210$ \\
+    16 & Count & $15.1$ & $0.510$ & $0.325$ & $0.228$ & $0.114$ & $0.495$ & $0.294$ \\
+    16 & Binary & $15.1$ & $0.548$ & $0.363$ & $0.234$ & $0.120$ & $0.537$ & $0.336$ \\
+    \addlinespace
+    17 & Continuous & $16.0$ & $0.435$ & $0.249$ & $0.195$ & $0.081$ & $0.424$ & $0.222$ \\
+    17 & Count & $16.0$ & $0.514$ & $0.328$ & $0.234$ & $0.121$ & $0.498$ & $0.297$ \\
+    17 & Binary & $16.0$ & $0.554$ & $0.368$ & $0.239$ & $0.126$ & $0.545$ & $0.344$ \\
+    \addlinespace
+    18 & Continuous & $17.0$ & $0.445$ & $0.260$ & $0.203$ & $0.090$ & $0.435$ & $0.234$ \\
+    18 & Count & $17.0$ & $0.514$ & $0.328$ & $0.234$ & $0.120$ & $0.499$ & $0.297$ \\
+    18 & Binary & $17.0$ & $0.548$ & $0.362$ & $0.239$ & $0.125$ & $0.537$ & $0.336$ \\
+    \addlinespace
+    19 & Continuous & $17.9$ & $0.454$ & $0.269$ & $0.210$ & $0.096$ & $0.445$ & $0.244$ \\
+    19 & Count & $17.9$ & $0.518$ & $0.332$ & $0.246$ & $0.132$ & $0.504$ & $0.303$ \\
+    19 & Binary & $17.9$ & $0.552$ & $0.366$ & $0.259$ & $0.145$ & $0.541$ & $0.340$ \\
+    \addlinespace
+    20 & Continuous & $18.8$ & $0.455$ & $0.270$ & $0.212$ & $0.098$ & $0.446$ & $0.245$ \\
+    20 & Count & $18.8$ & $0.529$ & $0.343$ & $0.231$ & $0.118$ & $0.515$ & $0.314$ \\
+    20 & Binary & $18.8$ & $0.570$ & $0.384$ & $0.240$ & $0.127$ & $0.557$ & $0.355$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Gap is $\hat\lambda_{\text{knn}}-\hat\lambda_{\text{geo}}$.
+  \end{tablenotes}
+\end{table}
+
+% --- Generated table: KNN type comparison ---
+\begin{table}[htbp]
+  \centering
+  \caption{Spatial error parameter by connection type and density: KNN-3 vs KNN-4, continuous vs count vs binary weights (full sample).}
+  \label{tab:knn-type}
+  \begin{tabular}{llcc}
+    \toprule
+    Weight type & Density & $\hat\lambda$ & Gap vs.\ $W_{\text{geo}}$ \\
+    \midrule
+    Continuous & $k=3$ & $0.228^{***}\,(0.012)$ & $0.042\ (z{=}2.59)^{***}$ \\
+    Count & $k=3$ & $0.353^{***}\,(0.013)$ & $0.167\ (z{=}9.95)^{***}$ \\
+    Binary & $k=3$ & $0.349^{***}\,(0.013)$ & $0.163\ (z{=}9.51)^{***}$ \\
+    \addlinespace
+    Continuous & $k=4$ & $0.264^{***}\,(0.013)$ & $0.078\ (z{=}4.54)^{***}$ \\
+    Count & $k=4$ & $0.366^{***}\,(0.014)$ & $0.180\ (z{=}10.17)^{***}$ \\
+    Binary & $k=4$ & $0.378^{***}\,(0.014)$ & $0.192\ (z{=}10.60)^{***}$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Continuous KNN matrices rank links by branch-weighted strength. Count and binary KNN matrices rank by shared-bank count; count weights retain counts, while binary weights are unweighted 0/1 links. All matrices are row-standardised.
+  \end{tablenotes}
+\end{table}
+
+\clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{Spatial autoregressive model: all matrices and samples}
+\begin{table}[htbp]
+  \centering
+  \caption{SAR robustness across weight matrices.}
+  \label{tab:sar-full}
+  \footnotesize
+  \begin{tabular}{llccc}
+    \toprule
+    Sample & Weight matrix & $\hat\rho$ & $\hat\beta_1$ & Gap vs.\ $W_{\text{geo}}$ \\
+    \midrule
+    Full & $W_{\text{geo}}$ & $0.177^{***}\,(0.011)$ & $0.022^{***}\,(0.004)$ & -- \\
+    Full & $W_{\text{bank}}$ & $0.646^{***}\,(0.036)$ & $0.020^{***}\,(0.004)$ & $0.469\ (z{=}12.62)$ \\
+    Full & $W_{\text{bank,count}}$ & $0.672^{***}\,(0.032)$ & $0.021^{***}\,(0.004)$ & $0.495\ (z{=}14.84)$ \\
+    Full & $W_{\text{bank,bin}}$ & $0.480^{***}\,(0.058)$ & $0.024^{***}\,(0.004)$ & $0.302\ (z{=}5.15)$ \\
+    Full & $W_{\text{bank,knn3}}$ & $0.219^{***}\,(0.012)$ & $0.021^{***}\,(0.004)$ & $0.042\ (z{=}2.61)$ \\
+    Full & $W_{\text{bank,knn4}}$ & $0.254^{***}\,(0.013)$ & $0.020^{***}\,(0.004)$ & $0.077\ (z{=}4.51)$ \\
+    Full & $W_{\text{bank,count,knn3}}$ & $0.371^{***}\,(0.012)$ & $0.023^{***}\,(0.004)$ & $0.194\ (z{=}11.79)$ \\
+    Full & $W_{\text{bank,count,knn4}}$ & $0.380^{***}\,(0.014)$ & $0.022^{***}\,(0.004)$ & $0.203\ (z{=}11.70)$ \\
+    Full & $W_{\text{bank,bin,knn3}}$ & $0.367^{***}\,(0.013)$ & $0.022^{***}\,(0.004)$ & $0.190\ (z{=}11.32)$ \\
+    Full & $W_{\text{bank,bin,knn4}}$ & $0.392^{***}\,(0.014)$ & $0.022^{***}\,(0.004)$ & $0.215\ (z{=}12.11)$ \\
+    Full & $W_{\text{bank,nonGeo}}$ & $0.511^{***}\,(0.044)$ & $0.018^{***}\,(0.004)$ & $0.332\ (z{=}7.24)$ \\
+    Full & $W_{\text{bank,inter}}$ & $0.337^{***}\,(0.061)$ & $0.018^{***}\,(0.004)$ & $0.158\ (z{=}2.54)$ \\
+    Full & $W_{\text{bank,intra}}$ & $0.339^{***}\,(0.017)$ & $0.020^{***}\,(0.004)$ & $0.162\ (z{=}7.91)$ \\
+    \addlinespace
+    Contig & $W_{\text{geo}}$ & $0.114^{***}\,(0.022)$ & $0.035^{***}\,(0.006)$ & -- \\
+    Contig & $W_{\text{bank}}$ & $0.381^{***}\,(0.050)$ & $0.030^{***}\,(0.006)$ & $0.267\ (z{=}4.93)$ \\
+    Contig & $W_{\text{bank,count}}$ & $0.415^{***}\,(0.045)$ & $0.031^{***}\,(0.006)$ & $0.301\ (z{=}5.99)$ \\
+    Contig & $W_{\text{bank,bin}}$ & $0.292^{***}\,(0.077)$ & $0.034^{***}\,(0.006)$ & $0.178\ (z{=}2.22)$ \\
+    Contig & $W_{\text{bank,knn3}}$ & $0.158^{***}\,(0.021)$ & $0.035^{***}\,(0.006)$ & $0.044\ (z{=}1.47)$ \\
+    Contig & $W_{\text{bank,knn4}}$ & $0.137^{***}\,(0.022)$ & $0.035^{***}\,(0.006)$ & $0.024\ (z{=}0.76)$ \\
+    Contig & $W_{\text{bank,count,knn3}}$ & $0.221^{***}\,(0.023)$ & $0.035^{***}\,(0.006)$ & $0.107\ (z{=}3.39)$ \\
+    Contig & $W_{\text{bank,count,knn4}}$ & $0.231^{***}\,(0.023)$ & $0.035^{***}\,(0.006)$ & $0.117\ (z{=}3.68)$ \\
+    Contig & $W_{\text{bank,bin,knn3}}$ & $0.205^{***}\,(0.024)$ & $0.036^{***}\,(0.006)$ & $0.091\ (z{=}2.85)$ \\
+    Contig & $W_{\text{bank,bin,knn4}}$ & $0.215^{***}\,(0.024)$ & $0.035^{***}\,(0.006)$ & $0.101\ (z{=}3.14)$ \\
+    Contig & $W_{\text{bank,nonGeo}}$ & $0.205^{***}\,(0.058)$ & $0.030^{***}\,(0.006)$ & $0.084\ (z{=}1.36)$ \\
+    Contig & $W_{\text{bank,inter}}$ & $0.299^{***}\,(0.058)$ & $0.026^{***}\,(0.006)$ & $0.191\ (z{=}3.07)$ \\
+    Contig & $W_{\text{bank,intra}}$ & $0.142^{***}\,(0.027)$ & $0.034^{***}\,(0.006)$ & $0.028\ (z{=}0.80)$ \\
+    \addlinespace
+    Non-contig & $W_{\text{geo}}$ & $0.186^{***}\,(0.012)$ & $0.019^{***}\,(0.005)$ & -- \\
+    Non-contig & $W_{\text{bank}}$ & $0.629^{***}\,(0.039)$ & $0.018^{***}\,(0.005)$ & $0.443\ (z{=}10.97)$ \\
+    Non-contig & $W_{\text{bank,count}}$ & $0.656^{***}\,(0.034)$ & $0.020^{***}\,(0.005)$ & $0.470\ (z{=}13.06)$ \\
+    Non-contig & $W_{\text{bank,bin}}$ & $0.433^{***}\,(0.064)$ & $0.020^{***}\,(0.005)$ & $0.247\ (z{=}3.78)$ \\
+    Non-contig & $W_{\text{bank,knn3}}$ & $0.222^{***}\,(0.013)$ & $0.017^{***}\,(0.005)$ & $0.036\ (z{=}2.00)$ \\
+    Non-contig & $W_{\text{bank,knn4}}$ & $0.258^{***}\,(0.014)$ & $0.016^{***}\,(0.005)$ & $0.072\ (z{=}3.90)$ \\
+    Non-contig & $W_{\text{bank,count,knn3}}$ & $0.394^{***}\,(0.013)$ & $0.020^{***}\,(0.005)$ & $0.208\ (z{=}11.74)$ \\
+    Non-contig & $W_{\text{bank,count,knn4}}$ & $0.381^{***}\,(0.014)$ & $0.020^{***}\,(0.005)$ & $0.195\ (z{=}10.39)$ \\
+    Non-contig & $W_{\text{bank,bin,knn3}}$ & $0.392^{***}\,(0.013)$ & $0.020^{***}\,(0.005)$ & $0.206\ (z{=}11.44)$ \\
+    Non-contig & $W_{\text{bank,bin,knn4}}$ & $0.388^{***}\,(0.015)$ & $0.019^{***}\,(0.005)$ & $0.202\ (z{=}10.56)$ \\
+    Non-contig & $W_{\text{bank,nonGeo}}$ & $0.529^{***}\,(0.048)$ & $0.016^{***}\,(0.005)$ & $0.342\ (z{=}6.89)$ \\
+    Non-contig & $W_{\text{bank,inter}}$ & $0.160^{***}\,(0.079)$ & $0.016^{***}\,(0.005)$ & $-0.030\ (z{=}-0.38)$ \\
+    Non-contig & $W_{\text{bank,intra}}$ & $0.328^{***}\,(0.019)$ & $0.017^{***}\,(0.005)$ & $0.142\ (z{=}6.39)$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} SAR is estimated by maximum likelihood with two-way fixed effects.
+  \end{tablenotes}
+\end{table}
+
+\clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{Spatial multiplier, reach, and hub counties}
+The SEM multiplier decomposition (full sample) is summarised in
+Table~\ref{tab:reach} in the main text: average geographic reach rises from
+$45$ km under $W_{\text{geo}}$ to $117$ and $134$ km under the density-matched
+KNN-3 and KNN-4 bank matrices, and to $1{,}053$ km under the full bank network,
+with the indirect share rising from $17.5\%$ to $21.8$--$25.4\%$ and $63.2\%$
+respectively.
+ 
+\begin{table}[htbp]
+  \centering
+  \caption{Top transmission hubs in the bank-network multiplier.}
+  \label{tab:hubs}
+  \footnotesize
+  \begin{tabular}{lll}
+    \toprule
+    Matrix & Direction & Top counties \\
+    \midrule
+    $W_{\text{bank}}$ & Sender & 37053 (North Carolina), 48055 (Texas), 48065 (Texas) \\
+    $W_{\text{bank}}$ & Receiver & 12021 (Florida), 47037 (Tennessee), 16019 (Idaho) \\
+    $W_{\text{bank,count}}$ & Sender & 31043 (Nebraska), 48055 (Texas), 37053 (North Carolina) \\
+    $W_{\text{bank,count}}$ & Receiver & 04013 (Arizona), 06037 (California), 53033 (Washington) \\
+    $W_{\text{bank,bin}}$ & Sender & 48065 (Texas), 37053 (North Carolina), 48281 (Texas) \\
+    $W_{\text{bank,bin}}$ & Receiver & 48085 (Texas), 12099 (Florida), 48201 (Texas) \\
+    $W_{\text{bank,knn3}}$ & Sender & 22111 (Louisiana), 48493 (Texas), 06083 (California) \\
+    $W_{\text{bank,knn3}}$ & Receiver & 48157 (Texas), 37135 (North Carolina), 27009 (Minnesota) \\
+    $W_{\text{bank,knn4}}$ & Sender & 27157 (Minnesota), 22031 (Louisiana), 48459 (Texas) \\
+    $W_{\text{bank,knn4}}$ & Receiver & 37135 (North Carolina), 48157 (Texas), 39109 (Ohio) \\
+    $W_{\text{bank,count,knn3}}$ & Sender & 37053 (North Carolina), 29043 (Missouri), 29021 (Missouri) \\
+    $W_{\text{bank,count,knn3}}$ & Receiver & 04013 (Arizona), 06037 (California), 12011 (Florida) \\
+    $W_{\text{bank,count,knn4}}$ & Sender & 42019 (Pennsylvania), 01081 (Alabama), 05035 (Arkansas) \\
+    $W_{\text{bank,count,knn4}}$ & Receiver & 04013 (Arizona), 06037 (California), 12011 (Florida) \\
+    $W_{\text{bank,bin,knn3}}$ & Sender & 25013 (Massachusetts), 22015 (Louisiana), 22005 (Louisiana) \\
+    $W_{\text{bank,bin,knn3}}$ & Receiver & 04013 (Arizona), 06037 (California), 12011 (Florida) \\
+    $W_{\text{bank,bin,knn4}}$ & Sender & 27139 (Minnesota), 27055 (Minnesota), 13117 (Georgia) \\
+    $W_{\text{bank,bin,knn4}}$ & Receiver & 04013 (Arizona), 06037 (California), 12011 (Florida) \\
+    $W_{\text{bank,nonGeo}}$ & Sender & 48065 (Texas), 47173 (Tennessee), 48291 (Texas) \\
+    $W_{\text{bank,nonGeo}}$ & Receiver & 12021 (Florida), 47037 (Tennessee), 12115 (Florida) \\
+    $W_{\text{bank,inter}}$ & Sender & 22099 (Louisiana), 48281 (Texas), 37053 (North Carolina) \\
+    $W_{\text{bank,inter}}$ & Receiver & 12021 (Florida), 04025 (Arizona), 04021 (Arizona) \\
+    $W_{\text{bank,intra}}$ & Sender & 37053 (North Carolina), 48055 (Texas), 13079 (Georgia) \\
+    $W_{\text{bank,intra}}$ & Receiver & 40143 (Oklahoma), 48201 (Texas), 17167 (Illinois) \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Top three counties by fitted transmission score.
+  \end{tablenotes}
+\end{table}
+
+\clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{Feasible GLS}
+\begin{table}[htbp]
+  \centering
+  \caption{Deregulation coefficient after spatial filtering (FGLS) versus within-OLS.}
+  \label{tab:fgls}
+  \small
+  \begin{tabular}{llccc}
+    \toprule
+    Sample & Estimator & $\hat\beta_1$ & SE & $p$ \\
+    \midrule
+    Full & OLS (Favara-Imbs) & $0.021$ & $0.010$ & $0.045$ \\
+    Full & FGLS W\_geo & $0.021$ & $0.012$ & $0.079$ \\
+    Full & FGLS W\_bank & $0.015$ & $0.012$ & $0.240$ \\
+    Full & FGLS W\_bank\_count & $0.016$ & $0.012$ & $0.183$ \\
+    Full & FGLS W\_bank\_binary & $0.018$ & $0.011$ & $0.088$ \\
+    Full & FGLS W\_bank\_knn3 & $0.020$ & $0.013$ & $0.114$ \\
+    Full & FGLS W\_bank\_knn4 & $0.019$ & $0.013$ & $0.147$ \\
+    Full & FGLS W\_bank\_count\_knn3 & $0.021$ & $0.013$ & $0.120$ \\
+    Full & FGLS W\_bank\_count\_knn4 & $0.021$ & $0.013$ & $0.115$ \\
+    Full & FGLS W\_bank\_binary\_knn3 & $0.021$ & $0.013$ & $0.116$ \\
+    Full & FGLS W\_bank\_binary\_knn4 & $0.021$ & $0.013$ & $0.117$ \\
+    Full & FGLS W\_bank\_nonGeo & $0.015$ & $0.012$ & $0.203$ \\
+    Full & FGLS W\_bank\_interstate & $0.017$ & $0.010$ & $0.104$ \\
+    Full & FGLS W\_bank\_intrastate & $0.022$ & $0.016$ & $0.167$ \\
+    \addlinespace
+    Contig & OLS (Favara-Imbs) & $0.031$ & $0.011$ & $0.003$ \\
+    Contig & FGLS W\_geo & $0.030$ & $0.011$ & $0.009$ \\
+    Contig & FGLS W\_bank & $0.022$ & $0.012$ & $0.064$ \\
+    Contig & FGLS W\_bank\_count & $0.022$ & $0.012$ & $0.053$ \\
+    Contig & FGLS W\_bank\_binary & $0.029$ & $0.011$ & $0.007$ \\
+    Contig & FGLS W\_bank\_knn3 & $0.033$ & $0.012$ & $0.006$ \\
+    Contig & FGLS W\_bank\_knn4 & $0.030$ & $0.011$ & $0.008$ \\
+    Contig & FGLS W\_bank\_count\_knn3 & $0.028$ & $0.012$ & $0.018$ \\
+    Contig & FGLS W\_bank\_count\_knn4 & $0.027$ & $0.012$ & $0.025$ \\
+    Contig & FGLS W\_bank\_binary\_knn3 & $0.028$ & $0.012$ & $0.017$ \\
+    Contig & FGLS W\_bank\_binary\_knn4 & $0.027$ & $0.012$ & $0.023$ \\
+    Contig & FGLS W\_bank\_nonGeo & $0.026$ & $0.011$ & $0.019$ \\
+    Contig & FGLS W\_bank\_interstate & $0.022$ & $0.011$ & $0.048$ \\
+    Contig & FGLS W\_bank\_intrastate & $0.032$ & $0.012$ & $0.010$ \\
+    \addlinespace
+    Non-contig & OLS (Favara-Imbs) & $0.017$ & $0.012$ & $0.170$ \\
+    Non-contig & FGLS W\_geo & $0.020$ & $0.015$ & $0.198$ \\
+    Non-contig & FGLS W\_bank & $0.015$ & $0.015$ & $0.321$ \\
+    Non-contig & FGLS W\_bank\_count & $0.016$ & $0.015$ & $0.278$ \\
+    Non-contig & FGLS W\_bank\_binary & $0.015$ & $0.013$ & $0.222$ \\
+    Non-contig & FGLS W\_bank\_knn3 & $0.016$ & $0.016$ & $0.293$ \\
+    Non-contig & FGLS W\_bank\_knn4 & $0.016$ & $0.016$ & $0.324$ \\
+    Non-contig & FGLS W\_bank\_count\_knn3 & $0.021$ & $0.016$ & $0.210$ \\
+    Non-contig & FGLS W\_bank\_count\_knn4 & $0.020$ & $0.016$ & $0.215$ \\
+    Non-contig & FGLS W\_bank\_binary\_knn3 & $0.020$ & $0.016$ & $0.211$ \\
+    Non-contig & FGLS W\_bank\_binary\_knn4 & $0.019$ & $0.016$ & $0.227$ \\
+    Non-contig & FGLS W\_bank\_nonGeo & $0.015$ & $0.014$ & $0.290$ \\
+    Non-contig & FGLS W\_bank\_interstate & $0.016$ & $0.012$ & $0.187$ \\
+    Non-contig & FGLS W\_bank\_intrastate & $0.018$ & $0.019$ & $0.337$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} State-clustered standard errors.
+  \end{tablenotes}
+\end{table}
+
+\clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{Non-nested specification: J-test}
+\begin{table}[htbp]
+  \centering
+  \caption{Davidson--MacKinnon $J$-tests, $W_{\text{geo}}$ versus bank-network matrices.}
+  \label{tab:jtest}
+  \footnotesize
+  \begin{tabular}{llccl}
+    \toprule
+    Sample & Rival $W$ & Dir. 1 $z$ & Dir. 2 $z$ & Conclusion \\
+    \midrule
+    Full & $W_{\text{bank}}$ & $11.67^{***}$ & $23.21^{***}$ & complementary \\
+    Full & $W_{\text{bank,count}}$ & $11.86^{***}$ & $24.06^{***}$ & complementary \\
+    Full & $W_{\text{bank,bin}}$ & $4.01^{***}$ & $23.16^{***}$ & complementary \\
+    Full & $W_{\text{bank,knn3}}$ & $18.74^{***}$ & $21.11^{***}$ & complementary \\
+    Full & $W_{\text{bank,knn4}}$ & $20.02^{***}$ & $19.96^{***}$ & complementary \\
+    Full & $W_{\text{bank,count,knn3}}$ & $14.06^{***}$ & $21.78^{***}$ & complementary \\
+    Full & $W_{\text{bank,count,knn4}}$ & $13.68^{***}$ & $23.15^{***}$ & complementary \\
+    Full & $W_{\text{bank,bin,knn3}}$ & $13.48^{***}$ & $21.02^{***}$ & complementary \\
+    Full & $W_{\text{bank,bin,knn4}}$ & $13.44^{***}$ & $21.84^{***}$ & complementary \\
+    Full & $W_{\text{bank,nonGeo}}$ & $9.13^{***}$ & $21.35^{***}$ & complementary \\
+    Full & $W_{\text{bank,inter}}$ & $4.55^{***}$ & $22.22^{***}$ & complementary \\
+    Full & $W_{\text{bank,intra}}$ & $20.76^{***}$ & $20.94^{***}$ & complementary \\
+    \addlinespace
+    Contig & $W_{\text{bank}}$ & $6.50^{***}$ & $8.40^{***}$ & complementary \\
+    Contig & $W_{\text{bank,count}}$ & $6.55^{***}$ & $8.56^{***}$ & complementary \\
+    Contig & $W_{\text{bank,bin}}$ & $0.27$ & $9.55^{***}$ & W\_null preferred \\
+    Contig & $W_{\text{bank,knn3}}$ & $10.21^{***}$ & $5.16^{***}$ & complementary \\
+    Contig & $W_{\text{bank,knn4}}$ & $7.09^{***}$ & $6.72^{***}$ & complementary \\
+    Contig & $W_{\text{bank,count,knn3}}$ & $5.32^{***}$ & $7.51^{***}$ & complementary \\
+    Contig & $W_{\text{bank,count,knn4}}$ & $4.94^{***}$ & $8.44^{***}$ & complementary \\
+    Contig & $W_{\text{bank,bin,knn3}}$ & $4.55^{***}$ & $8.30^{***}$ & complementary \\
+    Contig & $W_{\text{bank,bin,knn4}}$ & $4.23^{***}$ & $9.09^{***}$ & complementary \\
+    Contig & $W_{\text{bank,nonGeo}}$ & $2.84^{***}$ & $7.03^{***}$ & complementary \\
+    Contig & $W_{\text{bank,inter}}$ & $4.36^{***}$ & $5.90^{***}$ & complementary \\
+    Contig & $W_{\text{bank,intra}}$ & $7.12^{***}$ & $7.20^{***}$ & complementary \\
+    \addlinespace
+    Non-contig & $W_{\text{bank}}$ & $9.58^{***}$ & $26.79^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,count}}$ & $10.10^{***}$ & $28.35^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,bin}}$ & $3.07^{***}$ & $23.01^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,knn3}}$ & $17.02^{***}$ & $22.14^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,knn4}}$ & $19.18^{***}$ & $20.25^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,count,knn3}}$ & $13.18^{***}$ & $22.01^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,count,knn4}}$ & $12.44^{***}$ & $24.59^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,bin,knn3}}$ & $12.78^{***}$ & $21.25^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,bin,knn4}}$ & $12.10^{***}$ & $23.29^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,nonGeo}}$ & $9.28^{***}$ & $21.05^{***}$ & complementary \\
+    Non-contig & $W_{\text{bank,inter}}$ & $1.69^{*}$ & $22.39^{***}$ & W\_null preferred \\
+    Non-contig & $W_{\text{bank,intra}}$ & $18.74^{***}$ & $29.22^{***}$ & complementary \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Direction 1 adds the rival matrix prediction to the geographic model; Direction 2 reverses the roles.
+  \end{tablenotes}
+\end{table}
+
+ \clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{Robust inference: spatial HAC and multiway standard errors}
+\begin{table}[htbp]
+  \centering
+  \caption{Standard error of $\hat\beta_1$ under alternative covariance estimators (full sample).}
+  \label{tab:conley}
+  \small
+  \begin{tabular}{lcc}
+    \toprule
+    Estimator & SE & $t$ \\
+    \midrule
+    State clustering (Favara-Imbs) (cluster) & $0.0108$ & $2.35^{**}$ \\
+    Spatial HAC bartlett\_100km (bartlett) & $0.0054$ & $4.65^{***}$ \\
+    Spatial HAC bartlett\_250km (bartlett) & $0.0060$ & $4.21^{***}$ \\
+    Spatial HAC bartlett\_500km (bartlett) & $0.0067$ & $3.80^{***}$ \\
+    Spatial HAC binary\_band (binary\_band) & $0.0076$ & $3.35^{***}$ \\
+    Spatial HAC binary\_band\_knn3 (binary\_band) & $0.0054$ & $4.65^{***}$ \\
+    Spatial HAC binary\_band\_knn4 (binary\_band) & $0.0056$ & $4.53^{***}$ \\
+    Spatial HAC binary\_band\_count\_knn3 (binary\_band) & $0.0053$ & $4.82^{***}$ \\
+    Spatial HAC binary\_band\_count\_knn4 (binary\_band) & $0.0053$ & $4.80^{***}$ \\
+    Spatial HAC binary\_band\_binary\_knn3 (binary\_band) & $0.0053$ & $4.82^{***}$ \\
+    Spatial HAC binary\_band\_binary\_knn4 (binary\_band) & $0.0053$ & $4.80^{***}$ \\
+    Spatial HAC cosine (cosine) & $0.0047$ & $5.39^{***}$ \\
+    State + Spatial HAC binary\_band (two\_way\_binary\_band) & $0.0110$ & $2.29^{**}$ \\
+    State + Spatial HAC binary\_band\_knn3 (two\_way\_binary\_band\_knn3) & $0.0108$ & $2.35^{**}$ \\
+    State + Spatial HAC binary\_band\_knn4 (two\_way\_binary\_band\_knn4) & $0.0108$ & $2.34^{**}$ \\
+    State + Spatial HAC binary\_band\_count\_knn3 (two\_way\_binary\_band\_count\_knn3) & $0.0108$ & $2.35^{**}$ \\
+    State + Spatial HAC binary\_band\_count\_knn4 (two\_way\_binary\_band\_count\_knn4) & $0.0108$ & $2.35^{**}$ \\
+    State + Spatial HAC binary\_band\_binary\_knn3 (two\_way\_binary\_band\_binary\_knn3) & $0.0108$ & $2.35^{**}$ \\
+    State + Spatial HAC binary\_band\_binary\_knn4 (two\_way\_binary\_band\_binary\_knn4) & $0.0108$ & $2.35^{**}$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Point estimate fixed at the baseline deregulation coefficient.
+  \end{tablenotes}
+\end{table}
+
+\clearpage
+ 
+% ---------------------------------------------------------------------
+\subsection{SLX exposure to out-of-state deregulation}
+\begin{table}[htbp]
+  \centering
+  \caption{Full SLX exposure specifications.}
+  \label{tab:slx-full}
+  \footnotesize
+  \begin{tabular}{llccc}
+    \toprule
+    Sample & Spec. & $\hat\beta_D$ & $\hat\beta_E$ & Perm. $p$ \\
+    \midrule
+    Full & Base & $0.008^{**}$ & $--$ & $--$ \\
+    Full & SLX-OLS & $0.006^{*}$ & $0.016^{**}$ & $0.239$ \\
+    Full & SLX-Conley & $0.006^{***}$ & $0.016^{***}$ & $0.239$ \\
+    Full & SLX-Cluster & $0.006$ & $0.016$ & $0.239$ \\
+    Full & Placebo-OLS & $-0.002$ & $0.021^{***}$ & $--$ \\
+    \addlinespace
+    Contig & Base & $0.016^{***}$ & $--$ & $--$ \\
+    Contig & SLX-OLS & $0.012^{**}$ & $0.031^{***}$ & $0.036$ \\
+    Contig & SLX-Conley & $0.012^{***}$ & $0.031^{***}$ & $0.036$ \\
+    Contig & SLX-Cluster & $0.012$ & $0.031^{*}$ & $0.036$ \\
+    Contig & Placebo-OLS & $0.004$ & $0.009$ & $--$ \\
+    \addlinespace
+    Non-contig & Base & $0.004$ & $--$ & $--$ \\
+    Non-contig & SLX-OLS & $0.004$ & $0.003$ & $0.898$ \\
+    Non-contig & SLX-Conley & $0.004^{***}$ & $0.003^{*}$ & $0.898$ \\
+    Non-contig & SLX-Cluster & $0.004$ & $0.003$ & $0.898$ \\
+    Non-contig & Placebo-OLS & $-0.004$ & $0.026^{***}$ & $--$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Base rows omit the exposure term by construction.
+  \end{tablenotes}
+\end{table}
+ 
+% ---------------------------------------------------------------------
+\subsection{Look-ahead robustness: 1994 pre-sample network}
+\begin{table}[htbp]
+  \centering
+  \caption{Look-ahead robustness using the 1994 bank network.}
+  \label{tab:w1994}
+  \footnotesize
+  \begin{tabular}{llccc}
+    \toprule
+    Sample & Matrix & $\hat\lambda$ & Gap & Raw corr. \\
+    \midrule
+    Full & $W_{\text{geo}}$ & $0.176^{***}\,(0.011)$ & -- & $--$ \\
+    Full & $W_{\text{bank,1994}}$ & $0.391^{***}\,(0.030)$ & $0.215$ & $0.85$ \\
+    Full & $W_{\text{bank,knn3}}$ & $0.228^{***}\,(0.012)$ & $0.042$ & $--$ \\
+    Full & $W_{\text{bank,knn4}}$ & $0.264^{***}\,(0.013)$ & $0.078$ & $--$ \\
+    \addlinespace
+    Contig & $W_{\text{geo}}$ & $0.100^{***}\,(0.023)$ & -- & $--$ \\
+    Contig & $W_{\text{bank,1994}}$ & $0.250^{***}\,(0.041)$ & $0.150$ & $0.89$ \\
+    Contig & $W_{\text{bank,knn3}}$ & $0.158^{***}\,(0.021)$ & $0.044$ & $--$ \\
+    Contig & $W_{\text{bank,knn4}}$ & $0.138^{***}\,(0.023)$ & $0.024$ & $--$ \\
+    \addlinespace
+    Non-contig & $W_{\text{geo}}$ & $0.194^{***}\,(0.012)$ & -- & $--$ \\
+    Non-contig & $W_{\text{bank,1994}}$ & $0.391^{***}\,(0.034)$ & $0.198$ & $0.86$ \\
+    Non-contig & $W_{\text{bank,knn3}}$ & $0.236^{***}\,(0.013)$ & $0.034$ & $--$ \\
+    Non-contig & $W_{\text{bank,knn4}}$ & $0.274^{***}\,(0.014)$ & $0.073$ & $--$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Correlation statistics apply to the 1994 bank matrix rows.
+  \end{tablenotes}
+\end{table}
+
+\section{Estimation and inference details}
+\label{app:details}
+
+\subsection{Two-way within transformation}
+\label{app:within}
+For any variable $z_{c,t}$ the two-way within transformation is
+\begin{equation}
+  \tilde z_{c,t}=z_{c,t}-\bar z_{c,\cdot}-\bar z_{\cdot,t}+\bar z,
+  \label{eq:within}
+\end{equation}
+where $\bar z_{c,\cdot}$, $\bar z_{\cdot,t}$, and $\bar z$ are the county, year, and
+overall means; the last term is added back because the overall mean is removed once
+through each average. Estimating \eqref{eq:baseline} on transformed variables yields
+the same slopes as including county and year dummies, by Frisch--Waugh--Lovell. The
+same transformation is applied to every variable entering the custom estimators
+(outcome, treatment, controls, spatial lags, SLX exposure, FGLS-filtered
+variables); \texttt{spreg.Panel\_FE\_Error} and \texttt{spreg.Panel\_FE\_Lag} apply it
+internally.
+
+\subsection{SEM log-likelihood, geographic reach, and hubs}
+\label{app:semmult}
+With $Z_{c,t}=(D_{s,t-1},X_{c,t}')'$ and within-transformed $\tilde Z_t,\tilde y_t$,
+the filtered errors are $e_t(\delta,\lambda)=(I-\lambda W)(\tilde y_t-\tilde Z_t\delta)$
+and the log-likelihood is
+\begin{equation}
+  \ln\mathcal L=-\tfrac{NT}{2}\ln(2\pi\sigma^2)+T\ln|I-\lambda W|
+  -\tfrac{1}{2\sigma^2}\textstyle\sum_t e_t(\delta,\lambda)'e_t(\delta,\lambda),
+  \label{eq:semll}
+\end{equation}
+the determinant being the Jacobian correction that bars explosive $\lambda$
+\citep{anselin1988}. For the multiplier $S=(I-\lambda W)^{-1}=\sum_k\lambda^kW^k$, let
+$s_k$ be the order-$k$ impact share (the contribution of $\lambda^kW^k$ normalised
+across orders) and
+\begin{equation}
+  \bar d_k=\frac{\sum_{i,j}[W^k]_{ij}\,d_{ij}}{\sum_{i,j}[W^k]_{ij}}
+\end{equation}
+the $W^k$-weighted mean great-circle distance between centroids reachable in $k$
+steps. The average reach is $\text{reach}=\sum_{k\geq 1}s_k\bar d_k$, truncated at
+$\lVert\lambda^kW^k\rVert_\infty<10^{-4}$. Because $s_k$ depends only on $\lambda$
+for a row-standardised matrix, reach is not comparable across matrices of different
+density. The row and column sums of $S$ measure
+total transmission sent and received; ranking counties by these identifies hub
+counties (reported descriptively).
+
+\subsection{SAR marginal effects, counterfactual, and bootstrap}
+\label{app:sarmult}
+For a row-standardised $W$ the average effects of \eqref{eq:sar} are, following \cite{lesage2009},
+\begin{equation}
+  \text{Total}=\frac{\beta_1}{1-\rho},\quad
+  \text{Direct}=\beta_1\operatorname{diag}(I-\rho W)^{-1},\quad
+  \text{Indirect}=\text{Total}-\text{Direct},
+  \label{eq:sareffects}
+\end{equation}
+with $\text{Direct}\approx\beta_1$ and
+$\text{Indirect}\approx\beta_1\rho/(1-\rho)$ as $\rho\to 0$. For a unit shock the
+naive and network responses are $\Delta y_{\text{naive}}=\beta_1$ and
+$\Delta y_{\text{network}}=\beta_1/(1-\rho)$, their gap being the indirect effect.
+Confidence intervals come from a parametric bootstrap: draw
+$(\rho^*,\beta^*)\sim\mathcal N([\hat\rho,\hat\beta_1],\operatorname{diag}([\mathrm{SE}(\hat\rho)^2,\mathrm{SE}(\hat\beta_1)^2]))$,
+$1{,}000$ times, discard $|\rho^*|\geq 1$, recompute the effects, and take
+the $5$th and $95$th percentiles. Treating $\hat\rho,\hat\beta_1$ as independent is
+conservative for the indirect effect if they are positively correlated.
+
+\subsection{LM and robust LM statistics}
+\label{app:lm}
+With within-OLS residuals $\tilde u$, $\hat\sigma^2=\tilde u'\tilde u/(NT)$,
+signals $d=\tilde u'W\tilde u/\hat\sigma^2$ and $l=\tilde u'W\tilde y/\hat\sigma^2$,
+$T_1=\operatorname{tr}(W'W+W^2)$, and
+$D_e=(W\tilde X\hat\beta)'M(W\tilde X\hat\beta)/\hat\sigma^2$ (with $M$ the
+residual-maker for $\tilde X$), the standard statistics are
+\begin{equation}
+  \mathrm{LM}_{\text{error}}=\frac{d^2}{T_1},\qquad
+  \mathrm{LM}_{\text{lag}}=\frac{l^2}{D_e+T_1},
+\end{equation}
+and the robust versions
+\begin{equation}
+  \mathrm{rLM}_{\text{error}}=\frac{[d-T_1(D_e+T_1)^{-1}l]^2}{T_1[1-T_1(D_e+T_1)^{-1}]},
+  \qquad
+  \mathrm{rLM}_{\text{lag}}=\frac{(l-d)^2}{D_e},
+\end{equation}
+each $\chi^2(1)$ under its null \citep{burridge1980, anselin1988, anselin1996}.
+
+\subsection{FGLS variance and Hausman contrast}
+\label{app:fgls}
+In the single-regressor case the state-clustered variance of the FGLS coefficient
+is
+\begin{equation}
+  \widehat{\operatorname{Var}}(\hat\beta_{\text{FGLS}})=
+  \frac{\sum_s\big(\sum_{c\in s,t}(A\tilde x)_{ct}\hat\xi_{ct}\big)^2}
+  {\big(\sum_{c,t}(A\tilde x)_{ct}^2\big)^2}\cdot\frac{G}{G-1},
+  \qquad \hat\xi_{ct}=\tilde y_{ct}-\hat\beta_{\text{FGLS}}\tilde x_{ct},
+\end{equation}
+with the multivariate case using the cluster-robust sandwich on $A\tilde Z_t$. The
+OLS--FGLS contrast is
+\begin{equation}
+  H=\frac{(\hat\beta_{\text{OLS}}-\hat\beta_{\text{FGLS}})^2}
+  {\operatorname{Var}(\hat\beta_{\text{FGLS}})-\operatorname{Var}(\hat\beta_{\text{OLS}})},
+\end{equation}
+$\chi^2(1)$ when the denominator is positive, otherwise a difference-in-coefficients
+$t$-contrast \citep{greene2003, hausman1978}).
+
+\subsection{Instrumental-variables SAR and spatial Durbin IV}
+\label{app:ivsar}
+The spatial lag $(W\Delta\ln L)_{c,t}$ in the SAR of \eqref{eq:sar} is endogenous,
+so an alternative to maximum likelihood is the two-stage least-squares estimator of
+\citet{kelejian1998}, which instruments the spatial lag with higher-order spatial
+lags of the exogenous treatment. With $D=D_{s,t-1}$ the deregulation index, the
+excluded instruments are $W^2D$ and $W^3D$. In the spatial-Durbin variant (SDM-IV)
+of \citet{lesage2009} the first spatial lag $WD$ enters the equation as an
+\emph{included} regressor,
+\begin{equation}
+  \Delta\ln L_{c,t}=\rho(W\Delta\ln L)_{c,t}+\beta_1 D_{s,t-1}
+  +\bm\beta_2'X_{c,t}+\theta_{WD}(WD)_{c,t}+\alpha_c+\tau_t+\xi_{c,t},
+  \label{eq:sdmiv}
+\end{equation}
+with $W^2D,W^3D$ as the excluded instruments for $Wy$. Both estimators use the
+two-way within transformation and state-clustered standard errors.
+Table~\ref{tab:ivsar} reports the estimates; they are retained only as a
+post-mortem, for three reasons.
+ 
+First, the estimated spatial-lag parameter lies outside the $(-1,1)$ stability
+region in most specifications ($\hat\rho=1.30$--$2.31$ under geography, and
+$\hat\rho=1.48$ in the full bank-network KP-2SLS), which is not interpretable for a
+row-standardised $W$ and signals a poorly behaved instrument set. Second, the
+higher-order instruments are weak and collinear: under geography the first-stage
+$F$ is far below the \citet{stock2002} threshold of $10$ ($F=1.5$ and $0.98$ in the
+full sample), and throughout, the instruments are nearly collinear
+($\mathrm{corr}(WD,W^2D)\approx0.93$--$0.98$;
+$\mathrm{corr}(W^2D,W^3D)\approx0.97$--$0.99$), so the cluster-robust first-stage
+$F$ collapses even where the naive $F$ is large (e.g.\ $96\to5.0$ in the full bank
+sample). Third, and most fundamentally, the SDM-IV shows that $WD$ has a direct
+effect on credit growth: $\hat\theta_{WD}$ is positive and significant under the
+bank network ($0.105$ in the contiguous sample, $0.069$ in the full sample) ---
+exactly the cross-state exposure effect that the SLX regression of
+Section~\ref{sec:slx} documents. If $WD$ belongs in the equation, then $WD$ and its
+higher-order lags are not valid excluded instruments for $Wy$, and the exclusion
+restriction underlying the IV-SAR fails. Maximum likelihood, which does not rely on
+this exclusion restriction, is therefore the retained SAR estimator; the ML
+estimates of Table~\ref{tab:sar-full} lie well inside the stability region and are
+consistent with the SLX evidence.
+ 
+\begin{table}[htbp]
+  \centering
+  \caption{IV-SAR and SDM-IV estimates.}
+  \label{tab:ivsar}
+  \footnotesize
+  \begin{tabular}{lllcccc}
+    \toprule
+    Sample & $W$ & Spec. & $\hat\rho$ & $\hat\beta_1$ & First-stage $F$ & Cluster $F$ \\
+    \midrule
+    Full & $W_{\text{geo}}$ & KP-2SLS & $1.301$ & $0.002$ & $1.5$ & $0.08$ \\
+    Full & $W_{\text{geo}}$ & SDM-IV & $2.305$ & $0.001$ & $1.0$ & $0.16$ \\
+    Full & $W_{\text{bank}}$ & KP-2SLS & $1.481$ & $0.012$ & $96.1$ & $4.23$ \\
+    Full & $W_{\text{bank}}$ & SDM-IV & $0.167$ & $-0.002$ & $78.3$ & $4.47$ \\
+    \addlinespace
+    Contig & $W_{\text{geo}}$ & KP-2SLS & $1.463$ & $-0.006$ & $21.8$ & $0.04$ \\
+    Contig & $W_{\text{geo}}$ & SDM-IV & $2.041$ & $0.001$ & $11.2$ & $4.77$ \\
+    Contig & $W_{\text{bank}}$ & KP-2SLS & $0.881$ & $0.019$ & $116.7$ & $2.82$ \\
+    Contig & $W_{\text{bank}}$ & SDM-IV & $-0.054$ & $-0.008$ & $66.7$ & $0.48$ \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}\footnotesize
+  \item \emph{Notes.} Cluster $F$ is the squared state-clustered t-statistic for the first excluded instrument.
+  \end{tablenotes}
+\end{table}
+ 
+
+
+
+\section{Programming code}
+
+\end{document}

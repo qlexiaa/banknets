@@ -73,10 +73,18 @@ ESTIMATOR_LABELS = [
     "Spatial HAC binary_band",
     "Spatial HAC binary_band_knn3",
     "Spatial HAC binary_band_knn4",
+    "Spatial HAC binary_band_count_knn3",
+    "Spatial HAC binary_band_count_knn4",
+    "Spatial HAC binary_band_binary_knn3",
+    "Spatial HAC binary_band_binary_knn4",
     "Spatial HAC cosine",
     "State + Spatial HAC binary_band",
     "State + Spatial HAC binary_band_knn3",
     "State + Spatial HAC binary_band_knn4",
+    "State + Spatial HAC binary_band_count_knn3",
+    "State + Spatial HAC binary_band_count_knn4",
+    "State + Spatial HAC binary_band_binary_knn3",
+    "State + Spatial HAC binary_band_binary_knn4",
 ]
 
 
@@ -329,6 +337,8 @@ def stars(p):
 
 def build_sample(panel_sub, county_order,
                  W_bank_binary_raw_all, W_bank_knn3_raw_all, W_bank_knn4_raw_all,
+                 W_bank_count_knn3_raw_all, W_bank_count_knn4_raw_all,
+                 W_bank_binary_knn3_raw_all, W_bank_binary_knn4_raw_all,
                  W_bank_cosine_raw_all,
                  centroid_lats, centroid_lons,
                  YEARS, year_pos):
@@ -399,6 +409,10 @@ def build_sample(panel_sub, county_order,
     W_binary_sub    = W_bank_binary_raw_all[idx, :][:, idx]
     W_knn3_sub      = W_bank_knn3_raw_all[idx, :][:, idx]
     W_knn4_sub      = W_bank_knn4_raw_all[idx, :][:, idx]
+    W_count_knn3_sub = W_bank_count_knn3_raw_all[idx, :][:, idx]
+    W_count_knn4_sub = W_bank_count_knn4_raw_all[idx, :][:, idx]
+    W_binary_knn3_sub = W_bank_binary_knn3_raw_all[idx, :][:, idx]
+    W_binary_knn4_sub = W_bank_binary_knn4_raw_all[idx, :][:, idx]
     W_cosine_sub    = W_bank_cosine_raw_all[idx, :][:, idx]
 
     lats_sub = centroid_lats[idx] if centroid_lats is not None else None
@@ -412,6 +426,10 @@ def build_sample(panel_sub, county_order,
         W_binary=W_binary_sub,
         W_knn3=W_knn3_sub,
         W_knn4=W_knn4_sub,
+        W_count_knn3=W_count_knn3_sub,
+        W_count_knn4=W_count_knn4_sub,
+        W_binary_knn3=W_binary_knn3_sub,
+        W_binary_knn4=W_binary_knn4_sub,
         W_cosine=W_cosine_sub,
         lats=lats_sub, lons=lons_sub,
         usable=usable,
@@ -553,7 +571,15 @@ def compute_all_ses(s):
         se_band, kernel="binary_band", clip_pct=band_clip_pct)
 
     # -- Binary band kernels (KNN variants): standalone spatial + two-way ------
-    for knn_label, W_knn_sub in [("knn3", s["W_knn3"]), ("knn4", s["W_knn4"])]:
+    knn_kernels = [
+        ("knn3", s["W_knn3"]),
+        ("knn4", s["W_knn4"]),
+        ("count_knn3", s["W_count_knn3"]),
+        ("count_knn4", s["W_count_knn4"]),
+        ("binary_knn3", s["W_binary_knn3"]),
+        ("binary_knn4", s["W_binary_knn4"]),
+    ]
+    for knn_label, W_knn_sub in knn_kernels:
         K_knn          = binary_band_kernel(W_knn_sub)
         B_knn_spatial  = meat_spatial(u, x, K_knn)
         B_knn_overlap  = meat_twoway_overlap(u, x, K_knn, s["county_states"])
@@ -656,10 +682,18 @@ _COLORS = {
     "Spatial HAC binary_band":                   "#d01c8b",
     "Spatial HAC binary_band_knn3":              "#f1b6da",
     "Spatial HAC binary_band_knn4":              "#c51b7d",
+    "Spatial HAC binary_band_count_knn3":        "#80cdc1",
+    "Spatial HAC binary_band_count_knn4":        "#35978f",
+    "Spatial HAC binary_band_binary_knn3":       "#c7eae5",
+    "Spatial HAC binary_band_binary_knn4":       "#01665e",
     "Spatial HAC cosine":                        "#fc8d59",
     "State + Spatial HAC binary_band":           "#e66101",
     "State + Spatial HAC binary_band_knn3":      "#b35806",
     "State + Spatial HAC binary_band_knn4":      "#fdb863",
+    "State + Spatial HAC binary_band_count_knn3": "#8c510a",
+    "State + Spatial HAC binary_band_count_knn4": "#bf812d",
+    "State + Spatial HAC binary_band_binary_knn3": "#dfc27d",
+    "State + Spatial HAC binary_band_binary_knn4": "#a6611a",
 }
 _SHORT = [
     "State\nclustering",
@@ -669,10 +703,18 @@ _SHORT = [
     "Binary\nband",
     "Binary\nknn3",
     "Binary\nknn4",
+    "Count\nknn3",
+    "Count\nknn4",
+    "Bin-count\nknn3",
+    "Bin-count\nknn4",
     "Cosine",
     "Two-way\nband",
     "Two-way\nknn3",
     "Two-way\nknn4",
+    "Two-way\ncount3",
+    "Two-way\ncount4",
+    "Two-way\nbin3",
+    "Two-way\nbin4",
 ]
 
 
@@ -762,6 +804,10 @@ def run(output_dir=None):
     W_bank_binary_raw = scipy.sparse.load_npz(DATA / "W_bank_binary.npz")
     W_bank_knn3_raw   = scipy.sparse.load_npz(DATA / "W_bank_knn3.npz")
     W_bank_knn4_raw   = scipy.sparse.load_npz(DATA / "W_bank_knn4.npz")
+    W_bank_count_knn3_raw = scipy.sparse.load_npz(DATA / "W_bank_count_knn3.npz")
+    W_bank_count_knn4_raw = scipy.sparse.load_npz(DATA / "W_bank_count_knn4.npz")
+    W_bank_binary_knn3_raw = scipy.sparse.load_npz(DATA / "W_bank_binary_knn3.npz")
+    W_bank_binary_knn4_raw = scipy.sparse.load_npz(DATA / "W_bank_binary_knn4.npz")
     W_bank_cosine_raw = scipy.sparse.load_npz(DATA / "W_bank_avg.npz")
 
     # -- Load county centroids for bartlett kernel ----------------------------
@@ -791,6 +837,8 @@ def run(output_dir=None):
         s = build_sample(
             panel_sub, county_order,
             W_bank_binary_raw, W_bank_knn3_raw, W_bank_knn4_raw,
+            W_bank_count_knn3_raw, W_bank_count_knn4_raw,
+            W_bank_binary_knn3_raw, W_bank_binary_knn4_raw,
             W_bank_cosine_raw,
             c_lats, c_lons,
             YEARS, year_pos,

@@ -18,15 +18,13 @@ J-test direction (H0=W_null, H1=W_alt):
      J-z, J-p = res_aug.z_stat[-2]   -- two-sided
 
 Both directions are run; result classified as:
-  'W_alt preferred'      -- only D1 rejects
-  'W_null preferred'     -- only D2 rejects
-  'Indeterminate (both)' -- both reject
-  'Indeterminate (none)' -- neither rejects
+  'W_alt preferred'  -- only D1 rejects
+  'W_null preferred' -- only D2 rejects
+  'complementary'    -- both reject
+  'indeterminate'    -- neither rejects
 
-Pairs tested: W_geo vs {W_bank_bin, W_bank_count, W_bank_nonGeo}
-Samples:      Full, Border
-
-W_bank_nonGeo must exist at data/W_bank_nonGeo.npz (built by sem_w_variants.py).
+Pairs tested: W_geo vs all bank-network variants.
+Samples:      Full, Contig, NonContig
 
 Output: output/jtest_credit_results.csv
 """
@@ -51,6 +49,22 @@ ROOT        = Path(__file__).parents[2]
 COUNTY_PATH = ROOT / "data" / "county_order_Wgeo.csv"
 DV          = "Dl_nloans_b"
 X_VARS      = ["Linter_bra"] + CREDIT_CONTROLS
+
+SAMPLE_ORDER = ["Full", "Contig", "NonContig"]
+ALT_MATRICES = [
+    "W_bank",
+    "W_bank_count",
+    "W_bank_binary",
+    "W_bank_knn3",
+    "W_bank_knn4",
+    "W_bank_count_knn3",
+    "W_bank_count_knn4",
+    "W_bank_binary_knn3",
+    "W_bank_binary_knn4",
+    "W_bank_nonGeo",
+    "W_bank_interstate",
+    "W_bank_intrastate",
+]
 
 
 # ── Core helpers ─────────────────────────────────────────────────────────────
@@ -208,9 +222,9 @@ def run_pair(panel_sub, county_order, W_null_all, W_alt_all,
     elif d2["reject"] and not d1["reject"]:
         conclusion = "W_null preferred"
     elif d1["reject"] and d2["reject"]:
-        conclusion = "Indeterminate (both)"
+        conclusion = "complementary"
     else:
-        conclusion = "Indeterminate (none)"
+        conclusion = "indeterminate"
 
     return dict(
         sample     = sample_label,
@@ -247,15 +261,25 @@ def run(output_dir=None):
     YEARS    = sorted(panel["year"].unique())
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
 
+    missing = [w for w in ALT_MATRICES if w not in bank_variants]
+    if missing:
+        raise KeyError(f"load_bank_variants() did not return: {missing}")
+
     # W_geo as null, each bank variant as alternative
     PAIRS = [
         ("W_geo", W_geo_all, w_name, W_alt)
-        for w_name, W_alt in bank_variants.items()
+        for w_name, W_alt in ((w, bank_variants[w]) for w in ALT_MATRICES)
     ]
 
-    # ── Run all 7 pairs × 2 samples = 14 sets of J-tests ─────────────────────
+    # ── Run every bank-variant pair × 3 samples ──────────────────────────────
+    sample_lookup = dict(get_samples(panel))
+    missing_samples = [s for s in SAMPLE_ORDER if s not in sample_lookup]
+    if missing_samples:
+        raise KeyError(f"get_samples() did not return: {missing_samples}")
+
     rows = []
-    for sample_label, panel_sub in get_samples(panel):
+    for sample_label in SAMPLE_ORDER:
+        panel_sub = sample_lookup[sample_label]
         for w_null_label, W_null_all, w_alt_label, W_alt_all in PAIRS:
             print(f"  [{sample_label}] {w_null_label} vs {w_alt_label}")
             r = run_pair(
@@ -271,7 +295,10 @@ def run(output_dir=None):
     W = 108
     print()
     print("=" * W)
-    print("J-test (Davidson & MacKinnon 1981): W_geo vs all 7 bank weight matrices")
+    print(
+        "J-test (Davidson & MacKinnon 1981): "
+        f"W_geo vs all {len(ALT_MATRICES)} bank weight matrices"
+    )
     print("D1: H0=W_null, H1=W_alt  |  D2: H0=W_alt, H1=W_null  |  two-sided z")
     print("=" * W)
     print(
@@ -297,8 +324,8 @@ def run(output_dir=None):
     print("Significance: *** p<0.01  ** p<0.05  * p<0.10")
     print("W_alt preferred:      D1 rejects H0=W_null, D2 does not reject H0=W_alt")
     print("W_null preferred:     D2 rejects H0=W_alt,  D1 does not reject H0=W_null")
-    print("Indeterminate (both): both models contain independent spatial information")
-    print("Indeterminate (none): insufficient power to distinguish specifications")
+    print("complementary:        both models contain independent spatial information")
+    print("indeterminate:        insufficient power to distinguish specifications")
     print("=" * W)
 
     # ── Save CSV ──────────────────────────────────────────────────────────────
@@ -309,7 +336,17 @@ def run(output_dir=None):
             "d2_j_coeff", "d2_j_se", "d2_j_z", "d2_j_p", "d2_reject",
             "conclusion",
         ]
-        pd.DataFrame(rows)[cols].to_csv(
+        df_out = pd.DataFrame(rows, columns=cols)
+        expected_pairs = {(sample, w_alt) for sample in SAMPLE_ORDER for w_alt in ALT_MATRICES}
+        observed_pairs = set(zip(df_out["sample"], df_out["w_alt"]))
+        if len(df_out) != len(expected_pairs) or observed_pairs != expected_pairs:
+            missing_pairs = sorted(expected_pairs - observed_pairs)
+            extra_pairs = sorted(observed_pairs - expected_pairs)
+            raise RuntimeError(
+                f"Expected {len(expected_pairs)} J-test rows; got {len(df_out)}. "
+                f"Missing={missing_pairs}, extra={extra_pairs}"
+            )
+        df_out.to_csv(
             output_dir / "jtest_credit_results.csv", index=False
         )
         print(f"\nSaved jtest_credit_results.csv to {output_dir}")
