@@ -11,10 +11,10 @@ Variants
   W_bank_binary   : nonzero W_bank entries mapped to 1 (binary connectivity)
   W_bank_knn3     : top-3 nearest bank-network neighbours (from W_bank)
   W_bank_knn4     : top-4 nearest bank-network neighbours (from W_bank)
-  W_bank_count_knn3  : top-3 links ranked by count, count weights retained
-  W_bank_count_knn4  : top-4 links ranked by count, count weights retained
-  W_bank_binary_knn3 : top-3 links ranked by count, binary weights
-  W_bank_binary_knn4 : top-4 links ranked by count, binary weights
+  W_bank_count_knn3  : W_bank_knn3 neighbor set, re-weighted by branch count
+  W_bank_count_knn4  : W_bank_knn4 neighbor set, re-weighted by branch count
+  W_bank_binary_knn3 : W_bank_knn3 neighbor set, binary (0/1) weights
+  W_bank_binary_knn4 : W_bank_knn4 neighbor set, binary (0/1) weights
   W_bank_nonGeo   : W_bank with geographic-contiguity neighbours zeroed out
   W_bank_interstate : W_bank restricted to cross-state (i,j) pairs only
   W_bank_intrastate : W_bank restricted to within-state (i,j) pairs only
@@ -98,24 +98,25 @@ def _build_knn(W_bank_sp, k=4):
     return scipy.sparse.csr_matrix(W_knn)
 
 
-def _build_knn_from_count(W_count_sp, k, binary=False):
-    """Keep top-k connections ranked by count; weights are count or 1."""
-    W = W_count_sp.toarray().astype(np.float64)
-    np.fill_diagonal(W, 0.0)
-    N = W.shape[0]
-    W_knn = np.zeros_like(W)
-    for i in range(N):
-        row = W[i]
-        nz = np.count_nonzero(row)
-        if nz == 0:
-            continue
-        if nz <= k:
-            keep = np.flatnonzero(row)
-        else:
-            keep = np.argpartition(row, -k)[-k:]
-        W_knn[i, keep] = 1.0 if binary else row[keep]
-    np.fill_diagonal(W_knn, 0.0)
-    return scipy.sparse.csr_matrix(W_knn)
+def _build_reweighted_from_knn(W_knn_sp, W_full_weighted_sp):
+    """
+    Take the neighbor topology already selected by cosine-ranked
+    KNN truncation (W_knn_sp: W_bank_knn3 or W_bank_knn4), and
+    re-weight those same fixed positions using an alternative
+    weighting scheme (W_full_weighted_sp: the full, untruncated
+    binary or count matrix). Row-standardizes the result.
+
+    This ensures W_bank_binary_knn{k} and W_bank_count_knn{k} share
+    the EXACT SAME neighbor set as W_bank_knn{k} (cosine), differing
+    only in the weight assigned to each of the k selected links --
+    rather than independently re-selecting k neighbors from a
+    differently-ranked (or, for binary, tie-degenerate) matrix.
+    """
+    mask = (W_knn_sp.toarray() > 0)
+    W_full = W_full_weighted_sp.toarray()
+    W_reweighted = W_full * mask
+    np.fill_diagonal(W_reweighted, 0.0)
+    return row_standardize(scipy.sparse.csr_matrix(W_reweighted))
 
 
 def _build_nongeo(W_bank_sp, W_geo_sp):
@@ -221,29 +222,31 @@ def load_bank_variants(county_order, W_geo_all=None):
     W_knn4_raw = _load_or_build("W_bank_knn4", lambda: _build_knn(W_bank_raw, k=4))
     variants["W_bank_knn4"] = row_standardize(W_knn4_raw)
 
-    # 6. W_bank_count_knn3/knn4 (top-k by count, count weights retained)
+    # 6. W_bank_count_knn3/knn4 (W_bank_knn{k} neighbor set, re-weighted by
+    #    branch count -- same neighbors as the cosine KNN, different weights)
     W_count_knn3_raw = _load_or_build(
         "W_bank_count_knn3",
-        lambda: _build_knn_from_count(W_count_raw, k=3, binary=False),
+        lambda: _build_reweighted_from_knn(W_knn3_raw, W_count_raw),
     )
     variants["W_bank_count_knn3"] = row_standardize(W_count_knn3_raw)
 
     W_count_knn4_raw = _load_or_build(
         "W_bank_count_knn4",
-        lambda: _build_knn_from_count(W_count_raw, k=4, binary=False),
+        lambda: _build_reweighted_from_knn(W_knn4_raw, W_count_raw),
     )
     variants["W_bank_count_knn4"] = row_standardize(W_count_knn4_raw)
 
-    # 7. W_bank_binary_knn3/knn4 (top-k by count, binary weights)
+    # 7. W_bank_binary_knn3/knn4 (W_bank_knn{k} neighbor set, binary weights --
+    #    same neighbors as the cosine KNN, just 0/1 instead of continuous)
     W_bin_knn3_raw = _load_or_build(
         "W_bank_binary_knn3",
-        lambda: _build_knn_from_count(W_count_raw, k=3, binary=True),
+        lambda: _build_reweighted_from_knn(W_knn3_raw, W_bin_raw),
     )
     variants["W_bank_binary_knn3"] = row_standardize(W_bin_knn3_raw)
 
     W_bin_knn4_raw = _load_or_build(
         "W_bank_binary_knn4",
-        lambda: _build_knn_from_count(W_count_raw, k=4, binary=True),
+        lambda: _build_reweighted_from_knn(W_knn4_raw, W_bin_raw),
     )
     variants["W_bank_binary_knn4"] = row_standardize(W_bin_knn4_raw)
 
