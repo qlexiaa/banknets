@@ -3,9 +3,9 @@ sar_robustness_credit.py
 ========================
 SAR (Spatial Lag) robustness check for the credit-growth SEM result.
 
-Estimates spreg.Panel_FE_Lag on Dl_nloans_b under W_geo and W_bank for
-full and border samples using exactly the same panel construction,
-county filters, and W-loading as sem_credit.py.
+Estimates spreg.Panel_FE_Lag on Dl_nloans_b under W_geo and all bank-network
+W variants for the Full, Contig, and NonContig samples using the same panel
+construction, county filters, and W-loading as sem_credit.py.
 
 Panel_FE_Lag structural equation:
   y = rho * W*y + X*beta + county FE + u
@@ -95,7 +95,25 @@ def run(output_dir=None):
     T        = len(YEARS)
     year_pos = {yr: i for i, yr in enumerate(YEARS)}
 
-    BANK_MATRICES = list(bank_variants.items())
+    bank_matrix_order = [
+        "W_bank",
+        "W_bank_count",
+        "W_bank_binary",
+        "W_bank_knn3",
+        "W_bank_knn4",
+        "W_bank_count_knn3",
+        "W_bank_count_knn4",
+        "W_bank_binary_knn3",
+        "W_bank_binary_knn4",
+        "W_bank_nonGeo",
+        "W_bank_interstate",
+        "W_bank_intrastate",
+    ]
+    missing = [w for w in bank_matrix_order if w not in bank_variants]
+    if missing:
+        raise KeyError(f"load_bank_variants() did not return: {missing}")
+
+    BANK_MATRICES = [(w, bank_variants[w]) for w in bank_matrix_order]
     W_MATRICES = [("W_geo", W_geo_all)] + BANK_MATRICES
 
     # ── Build arrays for one (panel_sub, W_all) combination ──────────────────
@@ -165,7 +183,7 @@ def run(output_dir=None):
         if r is not None
     }
     for sample_label, panel_sub in get_samples(panel):
-        for w_name in bank_variants:
+        for w_name, _ in BANK_MATRICES:
             r_bank = results.get((sample_label, w_name))
             if r_bank is None:
                 paired_geo[(sample_label, w_name)] = None
@@ -203,7 +221,7 @@ def run(output_dir=None):
           f"{'rho':>8} {'SE':>6}  {'beta_D':>8} {'SE':>6}")
     print("-" * W)
 
-    w_keys = ["W_geo"] + list(bank_variants.keys())
+    w_keys = ["W_geo"] + bank_matrix_order
     for sample_label, _ in get_samples(panel):
         for w_name in w_keys:
             r = results.get((sample_label, w_name))
@@ -231,18 +249,6 @@ def run(output_dir=None):
                 gap_val, se_gap_val, z_gap_val, _ = gap_stat(r_geo, r)
             else:
                 gap_val, se_gap_val, z_gap_val = np.nan, np.nan, np.nan
-            if r_geo is None:
-                geo_fields = dict(
-                    rho_geo=np.nan, rho_geo_se=np.nan,
-                    beta_D_geo=np.nan, beta_D_geo_se=np.nan,
-                    n_counties_geo=np.nan, n_obs_geo=np.nan,
-                )
-            else:
-                geo_fields = dict(
-                    rho_geo=r_geo["rho"], rho_geo_se=r_geo["rho_se"],
-                    beta_D_geo=r_geo["beta_D"], beta_D_geo_se=r_geo["se_beta_D"],
-                    n_counties_geo=r_geo["n_co"], n_obs_geo=r_geo["n_obs"],
-                )
             csv_rows.append(dict(
                 sample     = sample_label,
                 w_matrix   = w_name,
@@ -252,7 +258,6 @@ def run(output_dir=None):
                 rho_se     = r["rho_se"],
                 beta_D     = r["beta_D"],
                 beta_D_se  = r["se_beta_D"],
-                **geo_fields,
                 delta_rho    = gap_val,
                 delta_rho_se = se_gap_val,
                 z_stat       = z_gap_val,
@@ -261,8 +266,6 @@ def run(output_dir=None):
     if output_dir is not None:
         cols = ["sample", "w_matrix", "n_counties", "n_obs",
                 "rho", "rho_se", "beta_D", "beta_D_se",
-                "rho_geo", "rho_geo_se", "beta_D_geo", "beta_D_geo_se",
-                "n_counties_geo", "n_obs_geo",
                 "delta_rho", "delta_rho_se", "z_stat"]
         pd.DataFrame(csv_rows)[cols].to_csv(
             output_dir / "sar_robustness_credit.csv", index=False)

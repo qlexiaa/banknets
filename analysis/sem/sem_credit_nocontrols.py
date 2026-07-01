@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
+sys.path.insert(0, str(Path(__file__).parent))
 import sem_credit as base
 from panel_data import load_panel_with_credit, get_samples
 from w_variants import load_w_geo, load_bank_variants

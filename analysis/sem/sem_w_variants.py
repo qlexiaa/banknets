@@ -5,6 +5,8 @@ Credit-growth SEM comparison across bank-network weight matrices.
 Dependent variable: Dl_nloans_b (dln commercial-bank mortgage loans).
 
 W matrices: W_geo | W_bank | W_bank_count | W_bank_binary | W_bank_knn3 | W_bank_knn4
+             | W_bank_count_knn3 | W_bank_count_knn4
+             | W_bank_binary_knn3 | W_bank_binary_knn4
              | W_bank_nonGeo | W_bank_interstate | W_bank_intrastate
 Samples:    Full  | Contig | NonContig
 
@@ -279,8 +281,20 @@ def run(output_dir=None):
                 "n_obs_geo","logll_geo",
                 "gap_vs_geo","se_gap","z_gap","p_gap_onesided",
                 "lr_vs_geo","p_lr_vs_geo"]
-        pd.DataFrame(csv_rows)[cols].to_csv(
-            output_dir / "four_w_comparison_credit.csv", index=False)
+        df_out = pd.DataFrame(csv_rows, columns=cols)
+        expected_rows = {
+            (sample_label, w_label)
+            for sample_label, _ in samples
+            for w_label, _ in W_MATRICES
+        }
+        observed_rows = set(zip(df_out["sample"], df_out["w_matrix"]))
+        if len(df_out) != len(expected_rows) or observed_rows != expected_rows:
+            raise RuntimeError(
+                f"Expected {len(expected_rows)} SEM variant rows; got {len(df_out)}. "
+                f"Missing={sorted(expected_rows - observed_rows)}, "
+                f"extra={sorted(observed_rows - expected_rows)}"
+            )
+        df_out.to_csv(output_dir / "four_w_comparison_credit.csv", index=False)
         print(f"\nSaved four_w_comparison_credit.csv to {output_dir}")
 
     return results

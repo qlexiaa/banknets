@@ -1,241 +1,261 @@
 outcome,w_matrix,direction,rank,fips5,state,total_transmission
-credit,W_geo,sender,1,08093,Colorado,0.22293693459494485
-credit,W_geo,sender,2,51760,Virginia,0.2223669818575295
-credit,W_geo,sender,3,34007,New Jersey,0.2222087892747227
-credit,W_geo,sender,4,34029,New Jersey,0.22218584969529645
-credit,W_geo,sender,5,13113,Georgia,0.22217596553209776
-credit,W_geo,sender,6,29510,Missouri,0.22215244048352836
-credit,W_geo,sender,7,34013,New Jersey,0.22211758108171725
-credit,W_geo,sender,8,13089,Georgia,0.22192870146368068
-credit,W_geo,sender,9,42045,Pennsylvania,0.22192601172821272
-credit,W_geo,sender,10,36087,New York,0.22185136594484436
-credit,W_geo,receiver,1,08059,Colorado,0.6125662401409898
-credit,W_geo,receiver,2,17119,Illinois,0.5057181426320059
-credit,W_geo,receiver,3,47093,Tennessee,0.49888517368425983
+credit,W_geo,sender,1,08093,Colorado,0.22293687679221522
+credit,W_geo,sender,2,34007,New Jersey,0.2222087892747227
+credit,W_geo,sender,3,34029,New Jersey,0.22218584969529642
+credit,W_geo,sender,4,29510,Missouri,0.22215244048352834
+credit,W_geo,sender,5,34013,New Jersey,0.22211758108171725
+credit,W_geo,sender,6,13089,Georgia,0.2219263857634781
+credit,W_geo,sender,7,42045,Pennsylvania,0.2219260117282127
+credit,W_geo,sender,8,51760,Virginia,0.2219146024753091
+credit,W_geo,sender,9,36087,New York,0.22185136594484434
+credit,W_geo,sender,10,42103,Pennsylvania,0.22176550961044567
+credit,W_geo,receiver,1,08059,Colorado,0.6182015045303004
+credit,W_geo,receiver,2,47093,Tennessee,0.5219569107256746
+credit,W_geo,receiver,3,17119,Illinois,0.5057181426320059
 credit,W_geo,receiver,4,55009,Wisconsin,0.49805028282726405
-credit,W_geo,receiver,5,13121,Georgia,0.48195118458438974
+credit,W_geo,receiver,5,13121,Georgia,0.48366889012239295
 credit,W_geo,receiver,6,40143,Oklahoma,0.47592318615955936
 credit,W_geo,receiver,7,47065,Tennessee,0.4692412896367898
-credit,W_geo,receiver,8,48029,Texas,0.45604167376884736
-credit,W_geo,receiver,9,21111,Kentucky,0.4419211718780183
+credit,W_geo,receiver,8,21111,Kentucky,0.4591729890282119
+credit,W_geo,receiver,9,48029,Texas,0.4560416737688473
 credit,W_geo,receiver,10,39095,Ohio,0.4366908750854518
-credit,W_bank,sender,1,13169,Georgia,1.7351485159374667
-credit,W_bank,sender,2,21223,Kentucky,1.7348685199547802
-credit,W_bank,sender,3,19017,Iowa,1.7348423841375729
-credit,W_bank,sender,4,37053,North Carolina,1.7345648766125084
-credit,W_bank,sender,5,20087,Kansas,1.7345289965185726
-credit,W_bank,sender,6,48055,Texas,1.7345153429812148
-credit,W_bank,sender,7,47057,Tennessee,1.7345077439075887
-credit,W_bank,sender,8,05025,Arkansas,1.734365757858765
-credit,W_bank,sender,9,48065,Texas,1.734357190901924
-credit,W_bank,sender,10,28093,Mississippi,1.7343270211402864
-credit,W_bank,receiver,1,12021,Florida,3.519346802521408
-credit,W_bank,receiver,2,47037,Tennessee,3.377975016683916
-credit,W_bank,receiver,3,16019,Idaho,3.32425929078907
-credit,W_bank,receiver,4,04021,Arizona,3.316304707751354
-credit,W_bank,receiver,5,04027,Arizona,3.291630564495453
-credit,W_bank,receiver,6,12115,Florida,3.2778459486968874
-credit,W_bank,receiver,7,04025,Arizona,3.256042336414657
-credit,W_bank,receiver,8,47021,Tennessee,3.2520988554597885
-credit,W_bank,receiver,9,47187,Tennessee,3.2508082633328517
-credit,W_bank,receiver,10,13255,Georgia,3.250181020112892
-credit,W_bank_knn3,sender,1,53011,Washington,0.29476993288782355
-credit,W_bank_knn3,sender,2,37101,North Carolina,0.29476993288782355
-credit,W_bank_knn3,sender,3,48493,Texas,0.29476993288782355
-credit,W_bank_knn3,sender,4,13103,Georgia,0.29476993288782355
-credit,W_bank_knn3,sender,5,39117,Ohio,0.29476993288782355
-credit,W_bank_knn3,sender,6,12057,Florida,0.29476993288782355
-credit,W_bank_knn3,sender,7,21029,Kentucky,0.29476993288782355
-credit,W_bank_knn3,sender,8,21123,Kentucky,0.29476993288782355
-credit,W_bank_knn3,sender,9,06083,California,0.29476993288782355
-credit,W_bank_knn3,sender,10,37079,North Carolina,0.2947699328878235
-credit,W_bank_knn3,receiver,1,48157,Texas,1.6721282232580854
-credit,W_bank_knn3,receiver,2,37135,North Carolina,1.5663901929861588
-credit,W_bank_knn3,receiver,3,27009,Minnesota,1.4494479880461344
-credit,W_bank_knn3,receiver,4,45063,South Carolina,1.445096410974136
-credit,W_bank_knn3,receiver,5,22087,Louisiana,1.4164118788234328
-credit,W_bank_knn3,receiver,6,39109,Ohio,1.200284849963715
-credit,W_bank_knn3,receiver,7,13097,Georgia,1.1957614485018537
-credit,W_bank_knn3,receiver,8,39057,Ohio,1.037039658463986
-credit,W_bank_knn3,receiver,9,01015,Alabama,0.9551345189878457
-credit,W_bank_knn3,receiver,10,35057,New Mexico,0.932506780890712
-credit,W_bank_knn4,sender,1,21179,Kentucky,0.357904153861498
-credit,W_bank_knn4,sender,2,22031,Louisiana,0.357904153861498
-credit,W_bank_knn4,sender,3,21223,Kentucky,0.357904153861498
-credit,W_bank_knn4,sender,4,31025,Nebraska,0.35790415386149793
-credit,W_bank_knn4,sender,5,13223,Georgia,0.35790415386149793
-credit,W_bank_knn4,sender,6,18179,Indiana,0.35790415386149793
-credit,W_bank_knn4,sender,7,48199,Texas,0.35790415386149793
-credit,W_bank_knn4,sender,8,29225,Missouri,0.35790415386149793
-credit,W_bank_knn4,sender,9,19121,Iowa,0.35790415386149793
-credit,W_bank_knn4,sender,10,47057,Tennessee,0.35790415386149793
-credit,W_bank_knn4,receiver,1,37135,North Carolina,1.7827257498300078
-credit,W_bank_knn4,receiver,2,48157,Texas,1.7764838489320107
-credit,W_bank_knn4,receiver,3,22087,Louisiana,1.5495688531284457
-credit,W_bank_knn4,receiver,4,39109,Ohio,1.532673294044324
-credit,W_bank_knn4,receiver,5,13097,Georgia,1.4300820408135237
-credit,W_bank_knn4,receiver,6,27009,Minnesota,1.3783444562163643
-credit,W_bank_knn4,receiver,7,45063,South Carolina,1.3549070984539113
-credit,W_bank_knn4,receiver,8,39057,Ohio,1.348107528939961
-credit,W_bank_knn4,receiver,9,35057,New Mexico,1.3328066682514677
-credit,W_bank_knn4,receiver,10,29019,Missouri,1.3059329996019342
-credit,W_geo,sender,1,29510,Missouri,0.12593563225304855
-credit,W_geo,sender,2,34013,New Jersey,0.12582640037148687
-credit,W_geo,sender,3,27123,Minnesota,0.1257506725539377
-credit,W_geo,sender,4,36047,New York,0.12567042617732102
-credit,W_geo,sender,5,34037,New Jersey,0.12562829681164162
-credit,W_geo,sender,6,29107,Missouri,0.12560525696427996
-credit,W_geo,sender,7,34019,New Jersey,0.1255765464209883
-credit,W_geo,sender,8,36061,New York,0.12552663966648298
-credit,W_geo,sender,9,17043,Illinois,0.12551554569081608
-credit,W_geo,sender,10,20103,Kansas,0.12550922025406422
-credit,W_geo,receiver,1,17119,Illinois,0.30862696123956923
-credit,W_geo,receiver,2,17031,Illinois,0.24061440269209775
-credit,W_geo,receiver,3,17161,Illinois,0.23591001051903832
-credit,W_geo,receiver,4,39025,Ohio,0.23586156185271362
-credit,W_geo,receiver,5,39061,Ohio,0.23274318932522378
-credit,W_geo,receiver,6,27053,Minnesota,0.23224409062223264
-credit,W_geo,receiver,7,21111,Kentucky,0.23185097504973892
-credit,W_geo,receiver,8,05033,Arkansas,0.22995702526994635
-credit,W_geo,receiver,9,27163,Minnesota,0.21925158767435418
-credit,W_geo,receiver,10,41051,Oregon,0.21618027918540986
-credit,W_bank,sender,1,21223,Kentucky,0.5441377033548949
-credit,W_bank,sender,2,17083,Illinois,0.542736782658172
-credit,W_bank,sender,3,29025,Missouri,0.5426229207460764
-credit,W_bank,sender,4,20107,Kansas,0.5423584920615085
-credit,W_bank,sender,5,29013,Missouri,0.5421377745350802
-credit,W_bank,sender,6,34033,New Jersey,0.5420829233355606
-credit,W_bank,sender,7,19163,Iowa,0.5418865168720776
-credit,W_bank,sender,8,17131,Illinois,0.5418240956270893
-credit,W_bank,sender,9,17031,Illinois,0.5417311975680373
-credit,W_bank,sender,10,18029,Indiana,0.5416731417672015
-credit,W_bank,receiver,1,05033,Arkansas,1.0762795308039417
-credit,W_bank,receiver,2,21185,Kentucky,1.0615389930918135
-credit,W_bank,receiver,3,29047,Missouri,1.0486653860603776
-credit,W_bank,receiver,4,20091,Kansas,1.044947731117645
-credit,W_bank,receiver,5,17163,Illinois,1.0254512511291978
-credit,W_bank,receiver,6,53011,Washington,0.903193088518124
-credit,W_bank,receiver,7,21037,Kentucky,0.8841091129759164
-credit,W_bank,receiver,8,18043,Indiana,0.8741620657236537
-credit,W_bank,receiver,9,29183,Missouri,0.873141117323329
-credit,W_bank,receiver,10,18019,Indiana,0.86458765606677
-credit,W_bank_knn3,sender,1,29063,Missouri,0.18698159521250857
-credit,W_bank_knn3,sender,2,41071,Oregon,0.18698159521250854
-credit,W_bank_knn3,sender,3,20103,Kansas,0.18698159521250854
-credit,W_bank_knn3,sender,4,53059,Washington,0.1869815952125085
-credit,W_bank_knn3,sender,5,54003,West Virginia,0.1869815952125085
-credit,W_bank_knn3,sender,6,54107,West Virginia,0.1869815952125085
-credit,W_bank_knn3,sender,7,41009,Oregon,0.1869815952125085
-credit,W_bank_knn3,sender,8,39167,Ohio,0.1869815952125085
-credit,W_bank_knn3,sender,9,39015,Ohio,0.1869815952125085
-credit,W_bank_knn3,sender,10,37025,North Carolina,0.1869815952125085
-credit,W_bank_knn3,receiver,1,29183,Missouri,0.5463666269706272
-credit,W_bank_knn3,receiver,2,54099,West Virginia,0.5097125272536144
-credit,W_bank_knn3,receiver,3,29165,Missouri,0.48874433138092266
-credit,W_bank_knn3,receiver,4,41005,Oregon,0.46522343800595134
-credit,W_bank_knn3,receiver,5,39025,Ohio,0.44512074382367556
-credit,W_bank_knn3,receiver,6,29021,Missouri,0.43993408052050725
-credit,W_bank_knn3,receiver,7,31153,Nebraska,0.4396827983689117
-credit,W_bank_knn3,receiver,8,29047,Missouri,0.43916416836694505
-credit,W_bank_knn3,receiver,9,29177,Missouri,0.4155234341400899
-credit,W_bank_knn3,receiver,10,24001,Maryland,0.4130547936261292
-credit,W_bank_knn4,sender,1,34033,New Jersey,0.15947445056949675
-credit,W_bank_knn4,sender,2,53011,Washington,0.15947445056949672
-credit,W_bank_knn4,sender,3,39015,Ohio,0.15947445056949672
-credit,W_bank_knn4,sender,4,21211,Kentucky,0.15947445056949672
-credit,W_bank_knn4,sender,5,20103,Kansas,0.15947445056949672
-credit,W_bank_knn4,sender,6,41009,Oregon,0.15947445056949672
-credit,W_bank_knn4,sender,7,17083,Illinois,0.15947445056949672
-credit,W_bank_knn4,sender,8,17117,Illinois,0.15947445056949672
-credit,W_bank_knn4,sender,9,21223,Kentucky,0.15947445056949672
-credit,W_bank_knn4,sender,10,27171,Minnesota,0.1594744505694967
-credit,W_bank_knn4,receiver,1,54099,West Virginia,0.4763379178089982
-credit,W_bank_knn4,receiver,2,29183,Missouri,0.4383392159923219
-credit,W_bank_knn4,receiver,3,29021,Missouri,0.43348162470162455
-credit,W_bank_knn4,receiver,4,17163,Illinois,0.40787273642133365
-credit,W_bank_knn4,receiver,5,44001,Rhode Island,0.3984739384930067
-credit,W_bank_knn4,receiver,6,29047,Missouri,0.38522989701688903
-credit,W_bank_knn4,receiver,7,27003,Minnesota,0.38516093279312225
-credit,W_bank_knn4,receiver,8,29177,Missouri,0.3483156408995458
-credit,W_bank_knn4,receiver,9,39025,Ohio,0.3388178442194799
-credit,W_bank_knn4,receiver,10,29165,Missouri,0.3355910665922536
-credit,W_geo,sender,1,08093,Colorado,0.2459667642979337
-credit,W_geo,sender,2,51760,Virginia,0.24527298599756175
-credit,W_geo,sender,3,13113,Georgia,0.24503700493249914
-credit,W_geo,sender,4,13089,Georgia,0.24474454490046
-credit,W_geo,sender,5,51036,Virginia,0.24454475290060657
-credit,W_geo,sender,6,13063,Georgia,0.24447860669901297
-credit,W_geo,sender,7,24025,Maryland,0.24416118395934894
-credit,W_geo,sender,8,06077,California,0.24362257741698887
-credit,W_geo,sender,9,33011,New Hampshire,0.2436201548732334
-credit,W_geo,sender,10,32003,Nevada,0.24361530175301108
-credit,W_geo,receiver,1,08059,Colorado,0.671972753434714
-credit,W_geo,receiver,2,47093,Tennessee,0.5641301935893157
-credit,W_geo,receiver,3,55009,Wisconsin,0.5438484610848827
-credit,W_geo,receiver,4,13121,Georgia,0.5319216375934668
-credit,W_geo,receiver,5,40143,Oklahoma,0.5227249058653044
-credit,W_geo,receiver,6,48029,Texas,0.501616475199076
-credit,W_geo,receiver,7,39095,Ohio,0.47783380313713486
-credit,W_geo,receiver,8,06071,California,0.47735284184155713
-credit,W_geo,receiver,9,42129,Pennsylvania,0.4771773499419526
-credit,W_geo,receiver,10,45045,South Carolina,0.4682913419499988
-credit,W_bank,sender,1,13169,Georgia,1.5820883888545922
-credit,W_bank,sender,2,19017,Iowa,1.581606458742066
-credit,W_bank,sender,3,48055,Texas,1.58138857825292
-credit,W_bank,sender,4,47057,Tennessee,1.581306320573707
-credit,W_bank,sender,5,05025,Arkansas,1.5811555761488494
-credit,W_bank,sender,6,48065,Texas,1.5811282063027357
-credit,W_bank,sender,7,48253,Texas,1.5808228447070318
-credit,W_bank,sender,8,48175,Texas,1.5807193341678918
-credit,W_bank,sender,9,48015,Texas,1.5804898137368952
-credit,W_bank,sender,10,48325,Texas,1.5803406125645476
-credit,W_bank,receiver,1,12021,Florida,3.040847001901673
-credit,W_bank,receiver,2,16019,Idaho,2.9741759513801767
-credit,W_bank,receiver,3,48245,Texas,2.9428135450355115
-credit,W_bank,receiver,4,04021,Arizona,2.907391024097235
-credit,W_bank,receiver,5,13021,Georgia,2.9065729648675247
-credit,W_bank,receiver,6,47037,Tennessee,2.889161647713757
-credit,W_bank,receiver,7,12071,Florida,2.879601752112808
-credit,W_bank,receiver,8,13255,Georgia,2.875134741912947
-credit,W_bank,receiver,9,04027,Arizona,2.86588628117998
-credit,W_bank,receiver,10,04025,Arizona,2.8382497638473234
-credit,W_bank_knn3,sender,1,06083,California,0.3082699009995934
-credit,W_bank_knn3,sender,2,08041,Colorado,0.3082699009995934
-credit,W_bank_knn3,sender,3,12057,Florida,0.3082699009995934
-credit,W_bank_knn3,sender,4,48199,Texas,0.3082699009995934
-credit,W_bank_knn3,sender,5,49045,Utah,0.3082699009995934
-credit,W_bank_knn3,sender,6,48459,Texas,0.3082699009995934
-credit,W_bank_knn3,sender,7,20191,Kansas,0.3082699009995934
-credit,W_bank_knn3,sender,8,26147,Michigan,0.3082699009995934
-credit,W_bank_knn3,sender,9,34011,New Jersey,0.3082699009995934
-credit,W_bank_knn3,sender,10,45039,South Carolina,0.3082699009995934
-credit,W_bank_knn3,receiver,1,48157,Texas,1.7522350651342677
-credit,W_bank_knn3,receiver,2,22087,Louisiana,1.4821833450541062
-credit,W_bank_knn3,receiver,3,37135,North Carolina,1.3925048228809018
-credit,W_bank_knn3,receiver,4,13097,Georgia,1.2659747986075107
-credit,W_bank_knn3,receiver,5,45063,South Carolina,1.2339255763687358
-credit,W_bank_knn3,receiver,6,39057,Ohio,1.1159096218551932
-credit,W_bank_knn3,receiver,7,39109,Ohio,1.0713166754673147
-credit,W_bank_knn3,receiver,8,01015,Alabama,1.0319638712359231
-credit,W_bank_knn3,receiver,9,55139,Wisconsin,0.9371056332875777
-credit,W_bank_knn3,receiver,10,06029,California,0.9265693652432606
-credit,W_bank_knn4,sender,1,30111,Montana,0.37703998463708643
-credit,W_bank_knn4,sender,2,36043,New York,0.37703998463708643
-credit,W_bank_knn4,sender,3,40031,Oklahoma,0.37703998463708643
-credit,W_bank_knn4,sender,4,22055,Louisiana,0.37703998463708643
-credit,W_bank_knn4,sender,5,48253,Texas,0.37703998463708643
-credit,W_bank_knn4,sender,6,18063,Indiana,0.37703998463708643
-credit,W_bank_knn4,sender,7,18179,Indiana,0.37703998463708643
-credit,W_bank_knn4,sender,8,45017,South Carolina,0.37703998463708643
-credit,W_bank_knn4,sender,9,48325,Texas,0.37703998463708643
-credit,W_bank_knn4,sender,10,22019,Louisiana,0.37703998463708643
-credit,W_bank_knn4,receiver,1,48157,Texas,1.877936922457254
-credit,W_bank_knn4,receiver,2,37135,North Carolina,1.6913325875011809
-credit,W_bank_knn4,receiver,3,22087,Louisiana,1.649738730772158
-credit,W_bank_knn4,receiver,4,13097,Georgia,1.4090522152504752
-credit,W_bank_knn4,receiver,5,39057,Ohio,1.3280821889055114
-credit,W_bank_knn4,receiver,6,16019,Idaho,1.3049617269284417
-credit,W_bank_knn4,receiver,7,35057,New Mexico,1.3038325977613003
-credit,W_bank_knn4,receiver,8,12097,Florida,1.2457544661379407
-credit,W_bank_knn4,receiver,9,39109,Ohio,1.232064376213501
-credit,W_bank_knn4,receiver,10,13063,Georgia,1.2153891219183954
+credit,W_bank,sender,1,37053,North Carolina,1.7345648686626733
+credit,W_bank,sender,2,48055,Texas,1.7345130336930008
+credit,W_bank,sender,3,48065,Texas,1.7343496327775973
+credit,W_bank,sender,4,31043,Nebraska,1.734239831376243
+credit,W_bank,sender,5,21029,Kentucky,1.7341178026539008
+credit,W_bank,sender,6,48253,Texas,1.7340792962753468
+credit,W_bank,sender,7,48015,Texas,1.7337431908581211
+credit,W_bank,sender,8,17131,Illinois,1.7336924301684156
+credit,W_bank,sender,9,47173,Tennessee,1.7336578301597232
+credit,W_bank,sender,10,48325,Texas,1.7336397666990915
+credit,W_bank,receiver,1,12021,Florida,3.466418422410034
+credit,W_bank,receiver,2,47037,Tennessee,3.2994767794628723
+credit,W_bank,receiver,3,16019,Idaho,3.2701190181318696
+credit,W_bank,receiver,4,04021,Arizona,3.2573908102403357
+credit,W_bank,receiver,5,04027,Arizona,3.2342503764620716
+credit,W_bank,receiver,6,12115,Florida,3.226429490680607
+credit,W_bank,receiver,7,04025,Arizona,3.1999855495138765
+credit,W_bank,receiver,8,48245,Texas,3.1955372975030296
+credit,W_bank,receiver,9,47021,Tennessee,3.1897292143033975
+credit,W_bank,receiver,10,49043,Utah,3.181583444181226
+credit,W_bank_count,sender,1,31043,Nebraska,1.8446101025395651
+credit,W_bank_count,sender,2,48055,Texas,1.8446017281134237
+credit,W_bank_count,sender,3,37053,North Carolina,1.8445923891408997
+credit,W_bank_count,sender,4,48065,Texas,1.8444538397193544
+credit,W_bank_count,sender,5,47173,Tennessee,1.8444365752313623
+credit,W_bank_count,sender,6,27157,Minnesota,1.8444257176187842
+credit,W_bank_count,sender,7,48253,Texas,1.8443560595017832
+credit,W_bank_count,sender,8,48401,Texas,1.84416835237585
+credit,W_bank_count,sender,9,21029,Kentucky,1.8441624366440794
+credit,W_bank_count,sender,10,47023,Tennessee,1.8440866606710753
+credit,W_bank_count,receiver,1,04013,Arizona,13.889156576074637
+credit,W_bank_count,receiver,2,06037,California,12.870691052687272
+credit,W_bank_count,receiver,3,53033,Washington,10.868450837121115
+credit,W_bank_count,receiver,4,48201,Texas,10.097965092790341
+credit,W_bank_count,receiver,5,48113,Texas,9.471681583100702
+credit,W_bank_count,receiver,6,12011,Florida,9.129592241312471
+credit,W_bank_count,receiver,7,12099,Florida,8.394065161785024
+credit,W_bank_count,receiver,8,13121,Georgia,7.9474459318329
+credit,W_bank_count,receiver,9,06073,California,7.853709011955731
+credit,W_bank_count,receiver,10,06059,California,7.795816829031448
+credit,W_bank_binary,sender,1,48065,Texas,0.6877928990160123
+credit,W_bank_binary,sender,2,37053,North Carolina,0.6877556574056911
+credit,W_bank_binary,sender,3,48281,Texas,0.6877249842470938
+credit,W_bank_binary,sender,4,48253,Texas,0.6877189449835512
+credit,W_bank_binary,sender,5,48459,Texas,0.6877073854444722
+credit,W_bank_binary,sender,6,17083,Illinois,0.6877064522549419
+credit,W_bank_binary,sender,7,31043,Nebraska,0.6877026165881401
+credit,W_bank_binary,sender,8,48325,Texas,0.6877025617922545
+credit,W_bank_binary,sender,9,47171,Tennessee,0.6877018238830949
+credit,W_bank_binary,sender,10,47173,Tennessee,0.6877004040146935
+credit,W_bank_binary,receiver,1,48085,Texas,1.3647698768075596
+credit,W_bank_binary,receiver,2,12099,Florida,1.3434930817591866
+credit,W_bank_binary,receiver,3,48201,Texas,1.2996844150542615
+credit,W_bank_binary,receiver,4,12021,Florida,1.2869011365695637
+credit,W_bank_binary,receiver,5,12115,Florida,1.2847008217104838
+credit,W_bank_binary,receiver,6,12071,Florida,1.2842332516741881
+credit,W_bank_binary,receiver,7,48113,Texas,1.2830510699772038
+credit,W_bank_binary,receiver,8,48453,Texas,1.2773090084319576
+credit,W_bank_binary,receiver,9,12057,Florida,1.272279870307687
+credit,W_bank_binary,receiver,10,48157,Texas,1.2676238667088136
+credit,W_bank_knn3,sender,1,06083,California,0.29476993288782355
+credit,W_bank_knn3,sender,2,53011,Washington,0.29476993288782355
+credit,W_bank_knn3,sender,3,48459,Texas,0.29476993288782355
+credit,W_bank_knn3,sender,4,12057,Florida,0.29476993288782355
+credit,W_bank_knn3,sender,5,22111,Louisiana,0.29476993288782355
+credit,W_bank_knn3,sender,6,48493,Texas,0.29476993288782355
+credit,W_bank_knn3,sender,7,39117,Ohio,0.29476993288782355
+credit,W_bank_knn3,sender,8,37053,North Carolina,0.2947699328878235
+credit,W_bank_knn3,sender,9,37025,North Carolina,0.2947699328878235
+credit,W_bank_knn3,sender,10,55083,Wisconsin,0.2947699328878235
+credit,W_bank_knn3,receiver,1,48157,Texas,1.663739164001905
+credit,W_bank_knn3,receiver,2,37135,North Carolina,1.566390980581211
+credit,W_bank_knn3,receiver,3,27009,Minnesota,1.4818872099282063
+credit,W_bank_knn3,receiver,4,45063,South Carolina,1.4450964109741362
+credit,W_bank_knn3,receiver,5,22087,Louisiana,1.3938495388443666
+credit,W_bank_knn3,receiver,6,39109,Ohio,1.1999529946986878
+credit,W_bank_knn3,receiver,7,13097,Georgia,1.1959053379038975
+credit,W_bank_knn3,receiver,8,39057,Ohio,1.03622887006959
+credit,W_bank_knn3,receiver,9,05045,Arkansas,1.0203160923179484
+credit,W_bank_knn3,receiver,10,01015,Alabama,0.9351408404237294
+credit,W_bank_knn4,sender,1,55063,Wisconsin,0.357904153861498
+credit,W_bank_knn4,sender,2,37053,North Carolina,0.357904153861498
+credit,W_bank_knn4,sender,3,37157,North Carolina,0.357904153861498
+credit,W_bank_knn4,sender,4,27157,Minnesota,0.357904153861498
+credit,W_bank_knn4,sender,5,21093,Kentucky,0.357904153861498
+credit,W_bank_knn4,sender,6,21047,Kentucky,0.357904153861498
+credit,W_bank_knn4,sender,7,22031,Louisiana,0.357904153861498
+credit,W_bank_knn4,sender,8,48065,Texas,0.357904153861498
+credit,W_bank_knn4,sender,9,13223,Georgia,0.357904153861498
+credit,W_bank_knn4,sender,10,21179,Kentucky,0.35790415386149793
+credit,W_bank_knn4,receiver,1,37135,North Carolina,1.7827308861162277
+credit,W_bank_knn4,receiver,2,48157,Texas,1.7667522190119163
+credit,W_bank_knn4,receiver,3,39109,Ohio,1.5302762610227372
+credit,W_bank_knn4,receiver,4,22087,Louisiana,1.516712933985364
+credit,W_bank_knn4,receiver,5,13097,Georgia,1.4332232199524482
+credit,W_bank_knn4,receiver,6,27009,Minnesota,1.4001366033412352
+credit,W_bank_knn4,receiver,7,45063,South Carolina,1.3549070984539116
+credit,W_bank_knn4,receiver,8,39057,Ohio,1.3462358650596409
+credit,W_bank_knn4,receiver,9,44001,Rhode Island,1.2099212655299172
+credit,W_bank_knn4,receiver,10,35057,New Mexico,1.1949191237150087
+credit,W_bank_count_knn3,sender,1,39045,Ohio,0.3023868327306896
+credit,W_bank_count_knn3,sender,2,39015,Ohio,0.3023868327306896
+credit,W_bank_count_knn3,sender,3,42021,Pennsylvania,0.3023868327306896
+credit,W_bank_count_knn3,sender,4,21179,Kentucky,0.3023868327306896
+credit,W_bank_count_knn3,sender,5,22031,Louisiana,0.3023868327306896
+credit,W_bank_count_knn3,sender,6,40031,Oklahoma,0.30238683273068956
+credit,W_bank_count_knn3,sender,7,39035,Ohio,0.30238683273068956
+credit,W_bank_count_knn3,sender,8,37157,North Carolina,0.30238683273068956
+credit,W_bank_count_knn3,sender,9,37069,North Carolina,0.30238683273068956
+credit,W_bank_count_knn3,sender,10,53015,Washington,0.30238683273068956
+credit,W_bank_count_knn3,receiver,1,45063,South Carolina,1.6197896622540096
+credit,W_bank_count_knn3,receiver,2,48157,Texas,1.560839009256817
+credit,W_bank_count_knn3,receiver,3,37135,North Carolina,1.4087313600638751
+credit,W_bank_count_knn3,receiver,4,18097,Indiana,1.3392805998379724
+credit,W_bank_count_knn3,receiver,5,05045,Arkansas,1.252556373316727
+credit,W_bank_count_knn3,receiver,6,27009,Minnesota,1.2267267486688727
+credit,W_bank_count_knn3,receiver,7,06029,California,1.2213190122684296
+credit,W_bank_count_knn3,receiver,8,39109,Ohio,1.1836686543559647
+credit,W_bank_count_knn3,receiver,9,47037,Tennessee,1.159689894866212
+credit,W_bank_count_knn3,receiver,10,01015,Alabama,1.1488690433550033
+credit,W_bank_count_knn4,sender,1,05053,Arkansas,0.35177879004287615
+credit,W_bank_count_knn4,sender,2,13195,Georgia,0.35177879004287615
+credit,W_bank_count_knn4,sender,3,20103,Kansas,0.35177879004287615
+credit,W_bank_count_knn4,sender,4,29225,Missouri,0.35177879004287615
+credit,W_bank_count_knn4,sender,5,26115,Michigan,0.35177879004287615
+credit,W_bank_count_knn4,sender,6,18011,Indiana,0.3517787900428761
+credit,W_bank_count_knn4,sender,7,34033,New Jersey,0.3517787900428761
+credit,W_bank_count_knn4,sender,8,18063,Indiana,0.3517787900428761
+credit,W_bank_count_knn4,sender,9,06083,California,0.3517787900428761
+credit,W_bank_count_knn4,sender,10,26075,Michigan,0.3517787900428761
+credit,W_bank_count_knn4,receiver,1,18097,Indiana,1.872553041843996
+credit,W_bank_count_knn4,receiver,2,39109,Ohio,1.5731029767192866
+credit,W_bank_count_knn4,receiver,3,48157,Texas,1.5646516104310537
+credit,W_bank_count_knn4,receiver,4,37135,North Carolina,1.4788144733191462
+credit,W_bank_count_knn4,receiver,5,05045,Arkansas,1.4736576209562708
+credit,W_bank_count_knn4,receiver,6,48453,Texas,1.4625101388923527
+credit,W_bank_count_knn4,receiver,7,45063,South Carolina,1.4587748271729486
+credit,W_bank_count_knn4,receiver,8,47093,Tennessee,1.3093860225661524
+credit,W_bank_count_knn4,receiver,9,01015,Alabama,1.2804236358575045
+credit,W_bank_count_knn4,receiver,10,40143,Oklahoma,1.2561922294531485
+credit,W_bank_binary_knn3,sender,1,05069,Arkansas,0.2879156912119268
+credit,W_bank_binary_knn3,sender,2,29225,Missouri,0.2879156912119268
+credit,W_bank_binary_knn3,sender,3,31025,Nebraska,0.2879156912119267
+credit,W_bank_binary_knn3,sender,4,22075,Louisiana,0.2879156912119267
+credit,W_bank_binary_knn3,sender,5,18055,Indiana,0.2879156912119267
+credit,W_bank_binary_knn3,sender,6,17131,Illinois,0.2879156912119267
+credit,W_bank_binary_knn3,sender,7,49045,Utah,0.2879156912119267
+credit,W_bank_binary_knn3,sender,8,48181,Texas,0.2879156912119267
+credit,W_bank_binary_knn3,sender,9,13207,Georgia,0.2879156912119267
+credit,W_bank_binary_knn3,sender,10,13047,Georgia,0.2879156912119267
+credit,W_bank_binary_knn3,receiver,1,48157,Texas,1.6779505940446198
+credit,W_bank_binary_knn3,receiver,2,37135,North Carolina,1.563849676519017
+credit,W_bank_binary_knn3,receiver,3,27009,Minnesota,1.542123604330792
+credit,W_bank_binary_knn3,receiver,4,22087,Louisiana,1.5179686994940682
+credit,W_bank_binary_knn3,receiver,5,45063,South Carolina,1.4545291866876764
+credit,W_bank_binary_knn3,receiver,6,13097,Georgia,1.2309035072430918
+credit,W_bank_binary_knn3,receiver,7,39109,Ohio,1.1652568014449547
+credit,W_bank_binary_knn3,receiver,8,05045,Arkansas,1.1365499226713105
+credit,W_bank_binary_knn3,receiver,9,35057,New Mexico,1.125322631164712
+credit,W_bank_binary_knn3,receiver,10,39057,Ohio,1.0219214785527249
+credit,W_bank_binary_knn4,sender,1,06083,California,0.3580640297261298
+credit,W_bank_binary_knn4,sender,2,21029,Kentucky,0.3580640297261298
+credit,W_bank_binary_knn4,sender,3,21179,Kentucky,0.3580640297261298
+credit,W_bank_binary_knn4,sender,4,05069,Arkansas,0.3580640297261298
+credit,W_bank_binary_knn4,sender,5,48459,Texas,0.3580640297261298
+credit,W_bank_binary_knn4,sender,6,13255,Georgia,0.3580640297261298
+credit,W_bank_binary_knn4,sender,7,31043,Nebraska,0.3580640297261297
+credit,W_bank_binary_knn4,sender,8,55025,Wisconsin,0.3580640297261297
+credit,W_bank_binary_knn4,sender,9,04013,Arizona,0.3580640297261297
+credit,W_bank_binary_knn4,sender,10,27171,Minnesota,0.3580640297261297
+credit,W_bank_binary_knn4,receiver,1,37135,North Carolina,1.800809477351625
+credit,W_bank_binary_knn4,receiver,2,48157,Texas,1.7877872834803512
+credit,W_bank_binary_knn4,receiver,3,22087,Louisiana,1.7212560705234852
+credit,W_bank_binary_knn4,receiver,4,39109,Ohio,1.5189987106918237
+credit,W_bank_binary_knn4,receiver,5,13097,Georgia,1.514841657569351
+credit,W_bank_binary_knn4,receiver,6,35057,New Mexico,1.4916704459904804
+credit,W_bank_binary_knn4,receiver,7,27009,Minnesota,1.4579084823513517
+credit,W_bank_binary_knn4,receiver,8,39057,Ohio,1.3686039743200602
+credit,W_bank_binary_knn4,receiver,9,45063,South Carolina,1.357926376538345
+credit,W_bank_binary_knn4,receiver,10,44001,Rhode Island,1.3092415436124258
+credit,W_bank_nonGeo,sender,1,48065,Texas,1.0825530807457435
+credit,W_bank_nonGeo,sender,2,47173,Tennessee,1.0824117880879753
+credit,W_bank_nonGeo,sender,3,48291,Texas,1.0822592179102881
+credit,W_bank_nonGeo,sender,4,48071,Texas,1.0821898251721267
+credit,W_bank_nonGeo,sender,5,46083,South Dakota,1.0821094243964158
+credit,W_bank_nonGeo,sender,6,37053,North Carolina,1.0820519308872485
+credit,W_bank_nonGeo,sender,7,51033,Virginia,1.0820310926048111
+credit,W_bank_nonGeo,sender,8,48253,Texas,1.0820197498140884
+credit,W_bank_nonGeo,sender,9,48459,Texas,1.0820141819606242
+credit,W_bank_nonGeo,sender,10,48015,Texas,1.0819518945178985
+credit,W_bank_nonGeo,receiver,1,12021,Florida,2.238312028883895
+credit,W_bank_nonGeo,receiver,2,37147,North Carolina,2.0926770615807997
+credit,W_bank_nonGeo,receiver,3,12115,Florida,2.08625913193757
+credit,W_bank_nonGeo,receiver,4,47037,Tennessee,2.084662944777428
+credit,W_bank_nonGeo,receiver,5,04021,Arizona,2.0812785667152043
+credit,W_bank_nonGeo,receiver,6,16019,Idaho,2.073183151004248
+credit,W_bank_nonGeo,receiver,7,04027,Arizona,2.050109474553386
+credit,W_bank_nonGeo,receiver,8,04025,Arizona,2.0450679505579603
+credit,W_bank_nonGeo,receiver,9,12071,Florida,2.0316250417811417
+credit,W_bank_nonGeo,receiver,10,49043,Utah,2.030233549282438
+credit,W_bank_interstate,sender,1,22099,Louisiana,0.459016189871464
+credit,W_bank_interstate,sender,2,48281,Texas,0.4590120055676232
+credit,W_bank_interstate,sender,3,37053,North Carolina,0.45900950802912854
+credit,W_bank_interstate,sender,4,48065,Texas,0.4590089851243896
+credit,W_bank_interstate,sender,5,47173,Tennessee,0.4589694200808467
+credit,W_bank_interstate,sender,6,31043,Nebraska,0.458965642400769
+credit,W_bank_interstate,sender,7,48253,Texas,0.45895673770279716
+credit,W_bank_interstate,sender,8,21123,Kentucky,0.4589314206072955
+credit,W_bank_interstate,sender,9,51101,Virginia,0.458921216615652
+credit,W_bank_interstate,sender,10,17083,Illinois,0.45891447142221414
+credit,W_bank_interstate,receiver,1,12021,Florida,1.122708482930368
+credit,W_bank_interstate,receiver,2,04025,Arizona,1.0504718788294525
+credit,W_bank_interstate,receiver,3,04021,Arizona,1.02945302800455
+credit,W_bank_interstate,receiver,4,04027,Arizona,1.0215091162719334
+credit,W_bank_interstate,receiver,5,13313,Georgia,1.0187900313223623
+credit,W_bank_interstate,receiver,6,12115,Florida,1.0041642233201309
+credit,W_bank_interstate,receiver,7,04013,Arizona,0.9890340615810909
+credit,W_bank_interstate,receiver,8,16019,Idaho,0.9873581823417473
+credit,W_bank_interstate,receiver,9,49043,Utah,0.9792344447668022
+credit,W_bank_interstate,receiver,10,04005,Arizona,0.9784438509140284
+credit,W_bank_intrastate,sender,1,37053,North Carolina,0.5344040077953823
+credit,W_bank_intrastate,sender,2,48055,Texas,0.5342100786971115
+credit,W_bank_intrastate,sender,3,13079,Georgia,0.5334754574136572
+credit,W_bank_intrastate,sender,4,48065,Texas,0.5334634703408275
+credit,W_bank_intrastate,sender,5,13047,Georgia,0.5333237438761658
+credit,W_bank_intrastate,sender,6,48015,Texas,0.5331964457170362
+credit,W_bank_intrastate,sender,7,39167,Ohio,0.5331852262131273
+credit,W_bank_intrastate,sender,8,13199,Georgia,0.5331286115394371
+credit,W_bank_intrastate,sender,9,48325,Texas,0.5330615739975787
+credit,W_bank_intrastate,sender,10,18029,Indiana,0.5329057275278464
+credit,W_bank_intrastate,receiver,1,40143,Oklahoma,1.2704308227350676
+credit,W_bank_intrastate,receiver,2,48201,Texas,1.1424846417479222
+credit,W_bank_intrastate,receiver,3,17167,Illinois,1.0769213214003321
+credit,W_bank_intrastate,receiver,4,20091,Kansas,1.0756836021791893
+credit,W_bank_intrastate,receiver,5,19155,Iowa,1.0328120176609987
+credit,W_bank_intrastate,receiver,6,31055,Nebraska,0.964246649756313
+credit,W_bank_intrastate,receiver,7,47093,Tennessee,0.9635513602777166
+credit,W_bank_intrastate,receiver,8,05045,Arkansas,0.9634754261285632
+credit,W_bank_intrastate,receiver,9,48245,Texas,0.9249031040643277
+credit,W_bank_intrastate,receiver,10,37147,North Carolina,0.9021134185469749

@@ -42,12 +42,28 @@ from panel_data import CREDIT_CONTROLS, load_panel_with_credit
 
 ROOT             = Path(__file__).parents[2]
 COUNTY_PATH      = ROOT / "data" / "county_order_Wgeo.csv"
-CREDIT_CSV       = ROOT / "output" / "panel_fe_credit_results.csv"
+CREDIT_CSV       = ROOT / "output" / "four_w_comparison_credit.csv"
 CENTROID_CACHE   = ROOT / "data" / "county_centroids.csv"
 
 DECAY_THRESHOLD  = 1e-4    # stop power series when contribution < this
 DECAY_MAX_K      = 600     # hard cap on expansion order
 HUB_TOP_N        = 10      # number of hub counties to report
+
+DISPLAY_MATRICES = [
+    "W_geo",
+    "W_bank",
+    "W_bank_count",
+    "W_bank_binary",
+    "W_bank_knn3",
+    "W_bank_knn4",
+    "W_bank_count_knn3",
+    "W_bank_count_knn4",
+    "W_bank_binary_knn3",
+    "W_bank_binary_knn4",
+    "W_bank_nonGeo",
+    "W_bank_interstate",
+    "W_bank_intrastate",
+]
 
 # Minimal FIPS-2 → state name lookup
 STATE_NAMES = {
@@ -74,22 +90,22 @@ def load_lambdas():
     lam = {}
     cr  = pd.read_csv(CREDIT_CSV)
 
-    for sample_tag in ["full", "contig", "noncontig"]:
-        geo_model = f"FE W_geo ({sample_tag})"
-        bank_model = f"FE W_bank ({sample_tag})"
-        bank_row = cr[cr["model"] == bank_model]
-        geo_row = cr[cr["model"] == geo_model]
-        if len(bank_row) > 0 and "lam_geo" in bank_row.columns and not pd.isna(bank_row["lam_geo"].iloc[0]):
-            lam[("credit", "W_geo", sample_tag)] = float(bank_row["lam_geo"].iloc[0])
-        elif len(geo_row) > 0:
-            lam[("credit", "W_geo", sample_tag)] = float(geo_row["lam"].iloc[0])
+    if {"sample", "w_matrix", "lam"}.issubset(cr.columns):
+        sample_tags = {"Full": "full", "Contig": "contig", "NonContig": "noncontig"}
+        for sample_label, sample_tag in sample_tags.items():
+            for w_tag in DISPLAY_MATRICES:
+                rows = cr.loc[
+                    (cr["sample"] == sample_label) & (cr["w_matrix"] == w_tag),
+                    "lam",
+                ]
+                if len(rows) > 0 and not pd.isna(rows.iloc[0]):
+                    lam[("credit", w_tag, sample_tag)] = float(rows.iloc[0])
+        return lam
 
-        for w_tag in ["W_geo", "W_bank", "W_bank_knn3", "W_bank_knn4"]:
-            if w_tag == "W_geo" and ("credit", "W_geo", sample_tag) in lam:
-                continue
+    for sample_tag in ["full", "contig", "noncontig"]:
+        for w_tag in DISPLAY_MATRICES:
             expected_model = f"FE {w_tag} ({sample_tag})"
-            mask = cr["model"] == expected_model
-            rows = cr.loc[mask, "lam"]
+            rows = cr.loc[cr["model"] == expected_model, "lam"]
             if len(rows) > 0:
                 lam[("credit", w_tag, sample_tag)] = float(rows.iloc[0])
 
@@ -288,16 +304,10 @@ def run(output_dir=None):
 
     W_geo_sp, _ = load_w_geo(county_order)
     bank_vars   = load_bank_variants(county_order, W_geo_all=W_geo_sp)
-    W_bank_sp   = bank_vars["W_bank"]
-    W_knn3_sp   = bank_vars["W_bank_knn3"]
-    W_knn4_sp   = bank_vars["W_bank_knn4"]
+    W_bank_sp = bank_vars["W_bank"]
 
-    W_MATS = {
-        "W_geo":       W_geo_sp,
-        "W_bank":      W_bank_sp,
-        "W_bank_knn3": W_knn3_sp,
-        "W_bank_knn4": W_knn4_sp,
-    }
+    W_MATS = {"W_geo": W_geo_sp}
+    W_MATS.update({name: bank_vars[name] for name in DISPLAY_MATRICES if name != "W_geo"})
 
     panel = load_panel_with_credit()
     panel["fips5"] = panel["fips5"].astype(str).str.zfill(5)
@@ -309,7 +319,7 @@ def run(output_dir=None):
             lambda g: g.isna().any().any())
         sub_co = set(panel_sub["fips5"].unique())
         island_sets = []
-        for W_sp in (W_geo_sp, W_bank_sp, W_knn3_sp, W_knn4_sp):
+        for W_sp in W_MATS.values():
             full_rs = np.array(W_sp.sum(axis=1)).flatten()
             island_sets.append({county_order[i] for i, r in enumerate(full_rs) if r == 0})
         islands = set().union(*island_sets)
@@ -331,9 +341,7 @@ def run(output_dir=None):
         return labels
 
     raw_sample_counties = {
-        "full":     _usable_counties(panel),
-        "contig":   _usable_counties(panel[panel["border"] == 1]),
-        "noncontig":_usable_counties(panel[panel["border"] == 0]),
+        "full": _usable_counties(panel),
     }
     SAMPLE_COUNTIES = {
         stag: _common_nonisland_counties(co_list)
@@ -362,20 +370,7 @@ def run(output_dir=None):
     all_decay    = []
     all_hubs     = []
 
-    COMBOS = [
-        ("credit", "W_geo",        "full"),
-        ("credit", "W_bank",       "full"),
-        ("credit", "W_bank_knn3",  "full"),
-        ("credit", "W_bank_knn4",  "full"),
-        ("credit", "W_geo",        "contig"),
-        ("credit", "W_bank",       "contig"),
-        ("credit", "W_bank_knn3",  "contig"),
-        ("credit", "W_bank_knn4",  "contig"),
-        ("credit", "W_geo",        "noncontig"),
-        ("credit", "W_bank",       "noncontig"),
-        ("credit", "W_bank_knn3",  "noncontig"),
-        ("credit", "W_bank_knn4",  "noncontig"),
-    ]
+    COMBOS = [("credit", w_label, "full") for w_label in DISPLAY_MATRICES]
 
     for outcome, w_label, sample_tag in COMBOS:
         key = (outcome, w_label, sample_tag)
@@ -394,7 +389,7 @@ def run(output_dir=None):
         # for every displayed W within a sample, so W_geo and W_bank multipliers
         # are computed on matched matrices.
         idx_samp    = np.array([county_order.index(c) for c in co_samp])
-        W_sp_sub    = W_sp[idx_samp, :][:, idx_samp].tocsr()
+        W_sp_sub    = row_standardize(W_sp[idx_samp, :][:, idx_samp].tocsr())
         co_sub      = list(co_samp)
         N_sub   = len(co_sub)
         W_dense = W_sp_sub.toarray().astype(np.float64)
@@ -402,7 +397,6 @@ def run(output_dir=None):
         nonzero_rows = row_sums[:, 0] > 0
         if not np.all(nonzero_rows):
             raise RuntimeError(f"Zero-row county remained in {w_label} / {sample_tag}")
-        W_dense[nonzero_rows] /= row_sums[nonzero_rows]
 
         # ── 1. Inverse ────────────────────────────────────────────────────────
         print(f"  Computing (I - lambda*W)^{{-1}} on {N_sub}x{N_sub} matrix ...")
@@ -511,13 +505,46 @@ def run(output_dir=None):
     # ── Save outputs ──────────────────────────────────────────────────────────
     if output_dir is not None:
         # Main summary
-        pd.DataFrame(summary_rows).to_csv(
+        summary_df = pd.DataFrame(summary_rows)
+        required_summary_cols = [
+            "avg_indirect", "indirect_share_pct", "avg_reach_km",
+            "med_reach_km", "n_decay_terms",
+        ]
+        missing_rows = [
+            (w_label, "full")
+            for w_label in DISPLAY_MATRICES
+            if summary_df[
+                (summary_df["outcome"] == "credit")
+                & (summary_df["sample"] == "full")
+                & (summary_df["w_matrix"] == w_label)
+            ].empty
+        ]
+        if missing_rows:
+            raise RuntimeError(f"Missing multiplier rows: {missing_rows}")
+        if len(summary_df) != len(DISPLAY_MATRICES):
+            raise RuntimeError(
+                f"Expected {len(DISPLAY_MATRICES)} multiplier rows, got {len(summary_df)}"
+            )
+        if summary_df[required_summary_cols].isna().any().any():
+            bad = summary_df.loc[
+                summary_df[required_summary_cols].isna().any(axis=1),
+                ["outcome", "w_matrix", "sample"],
+            ]
+            raise RuntimeError(f"Null multiplier summary values:\n{bad}")
+        summary_df.to_csv(
             output_dir / "spatial_multiplier_decomposition.csv", index=False)
         print(f"\nSaved spatial_multiplier_decomposition.csv")
 
         # Decay series
         decay_cols = ["outcome", "w_matrix", "sample", "order_k", "contribution", "cumulative_share"]
-        pd.concat(all_decay, ignore_index=True)[decay_cols].to_csv(
+        decay_df = pd.concat(all_decay, ignore_index=True)[decay_cols]
+        if decay_df[
+            (decay_df["outcome"] == "credit")
+            & (decay_df["sample"] == "full")
+            & (decay_df["w_matrix"] == "W_bank_knn4")
+        ].empty:
+            raise RuntimeError("No W_bank_knn4 rows written to spatial_multiplier_decay.csv")
+        decay_df.to_csv(
             output_dir / "spatial_multiplier_decay.csv", index=False)
         print("Saved spatial_multiplier_decay.csv")
 
